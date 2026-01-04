@@ -128,9 +128,11 @@ impl ClaudeConfig {
 
     /// Get the config file path
     pub fn config_file_path() -> PathBuf {
-        let config_dir = dirs::config_dir()
-            .unwrap_or_else(|| dirs::home_dir().expect("Could not determine home directory").join(".config"));
-        config_dir.join("vibedev").join("claude_config.json")
+        dirs::config_dir()
+            .or_else(|| dirs::home_dir().map(|h| h.join(".config")))
+            .expect("Could not determine config directory or home directory")
+            .join("vibedev")
+            .join("claude_config.json")
     }
 
     /// Write Claude Code's actual config files
@@ -196,12 +198,24 @@ impl ClaudeConfig {
 
     /// Generate Claude Code compatible configuration
     fn generate_claude_code_config(&self) -> String {
-        serde_json::json!({
-            "apiUrl": self.endpoint,
-            "apiKey": self.api_key,
-            "model": self.model,
-            "provider": self.provider.name(),
-        }).to_string()
+        #[derive(serde::Serialize)]
+        struct ClaudeCodeConfig<'a> {
+            #[serde(rename = "apiUrl")]
+            api_url: &'a str,
+            #[serde(rename = "apiKey")]
+            api_key: &'a str,
+            model: &'a str,
+            provider: &'a str,
+        }
+        
+        let config = ClaudeCodeConfig {
+            api_url: &self.endpoint,
+            api_key: &self.api_key,
+            model: &self.model,
+            provider: self.provider.name(),
+        };
+        
+        serde_json::to_string(&config).unwrap_or_default()
     }
 }
 
@@ -241,7 +255,11 @@ pub fn show_current_config() -> Result<()> {
             println!("  Provider: {}", config.provider.name().green());
             println!("  Endpoint: {}", config.endpoint);
             println!("  Model: {}", config.model);
-            println!("  API Key: {}...", &config.api_key.chars().take(8).collect::<String>());
+            if config.api_key.len() > 4 {
+                println!("  API Key: ****{}", &config.api_key[config.api_key.len() - 4..]);
+            } else {
+                println!("  API Key: ****");
+            }
             if let Some(org_id) = &config.organization_id {
                 println!("  Organization ID: {}", org_id);
             }
