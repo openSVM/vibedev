@@ -1,11 +1,19 @@
 // LLM Daemon - Keeps model loaded in memory for fast queries
+// Unix-only: Uses Unix domain sockets for IPC
+
+#[cfg(unix)]
 use crate::embedded_llm::{DeviceType, EmbeddedLlm, Quantization};
 use anyhow::{anyhow, Result};
+#[cfg(unix)]
 use std::fs;
+#[cfg(unix)]
 use std::io::{BufRead, BufReader, Write};
+#[cfg(unix)]
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::PathBuf;
+#[cfg(unix)]
 use std::sync::{Arc, Mutex};
+#[cfg(unix)]
 use std::thread;
 
 const SOCKET_NAME: &str = "vibedev.sock";
@@ -19,6 +27,7 @@ pub fn get_socket_path() -> PathBuf {
 }
 
 /// Get the PID file path
+#[cfg(unix)]
 pub fn get_pid_path() -> PathBuf {
     dirs::runtime_dir()
         .or_else(dirs::cache_dir)
@@ -27,6 +36,7 @@ pub fn get_pid_path() -> PathBuf {
 }
 
 /// Check if daemon is running
+#[cfg(unix)]
 pub fn is_running() -> bool {
     let socket_path = get_socket_path();
     if !socket_path.exists() {
@@ -37,7 +47,13 @@ pub fn is_running() -> bool {
     UnixStream::connect(&socket_path).is_ok()
 }
 
+#[cfg(not(unix))]
+pub fn is_running() -> bool {
+    false
+}
+
 /// Send a query to the daemon
+#[cfg(unix)]
 pub fn query(prompt: &str, context: Option<&str>) -> Result<String> {
     let socket_path = get_socket_path();
     let mut stream = UnixStream::connect(&socket_path)
@@ -69,7 +85,13 @@ pub fn query(prompt: &str, context: Option<&str>) -> Result<String> {
     }
 }
 
+#[cfg(not(unix))]
+pub fn query(_prompt: &str, _context: Option<&str>) -> Result<String> {
+    Err(anyhow!("Daemon mode is only supported on Unix systems"))
+}
+
 /// Get daemon status
+#[cfg(unix)]
 pub fn status() -> Result<String> {
     let socket_path = get_socket_path();
     let mut stream =
@@ -86,7 +108,13 @@ pub fn status() -> Result<String> {
     Ok(response)
 }
 
+#[cfg(not(unix))]
+pub fn status() -> Result<String> {
+    Err(anyhow!("Daemon mode is only supported on Unix systems"))
+}
+
 /// Stop the daemon
+#[cfg(unix)]
 pub fn stop() -> Result<()> {
     let socket_path = get_socket_path();
 
@@ -110,7 +138,13 @@ pub fn stop() -> Result<()> {
     Ok(())
 }
 
+#[cfg(not(unix))]
+pub fn stop() -> Result<()> {
+    Err(anyhow!("Daemon mode is only supported on Unix systems"))
+}
+
 /// Start the daemon (blocking)
+#[cfg(unix)]
 pub fn start(
     model_id: Option<&str>,
     device_type: Option<DeviceType>,
@@ -158,6 +192,16 @@ pub fn start(
     Ok(())
 }
 
+#[cfg(not(unix))]
+pub fn start(
+    _model_id: Option<&str>,
+    _device_type: Option<crate::embedded_llm::DeviceType>,
+    _quantization: Option<crate::embedded_llm::Quantization>,
+) -> Result<()> {
+    Err(anyhow!("Daemon mode is only supported on Unix systems (Linux/macOS). On Windows, use 'vibedev chat' directly."))
+}
+
+#[cfg(unix)]
 fn handle_client(stream: UnixStream, llm: Arc<Mutex<EmbeddedLlm>>) -> Result<()> {
     let mut reader = BufReader::new(stream.try_clone()?);
     let mut writer = stream;
@@ -218,6 +262,7 @@ pub struct DaemonInfo {
     pub socket: PathBuf,
 }
 
+#[cfg(unix)]
 pub fn info() -> DaemonInfo {
     let socket = get_socket_path();
 
@@ -250,5 +295,15 @@ pub fn info() -> DaemonInfo {
         model: None,
         pid: None,
         socket,
+    }
+}
+
+#[cfg(not(unix))]
+pub fn info() -> DaemonInfo {
+    DaemonInfo {
+        running: false,
+        model: None,
+        pid: None,
+        socket: get_socket_path(),
     }
 }
