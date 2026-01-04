@@ -48,7 +48,7 @@ use report_analyzer::ReportAnalyzer;
 use ultra_deep::UltraDeepAnalyzer;
 
 #[derive(Parser)]
-#[command(name = "vibecheck")]
+#[command(name = "vibedev")]
 #[command(about = "Analyze AI coding assistant logs and generate insights", long_about = None)]
 #[command(version)]
 struct Cli {
@@ -227,7 +227,7 @@ enum Commands {
 
     /// Chat with your data using embedded offline LLM
     Chat {
-        /// Model to use (run 'vibecheck models' to see available)
+        /// Model to use (run 'vibedev models' to see available)
         #[arg(short, long)]
         model: Option<String>,
 
@@ -999,7 +999,7 @@ async fn main() -> Result<()> {
                     println!("  {} - {}", name.green(), description);
                 }
                 println!();
-                println!("Usage: vibecheck chat --topic <name>");
+                println!("Usage: vibedev chat --topic <name>");
                 return Ok(());
             }
 
@@ -1034,7 +1034,7 @@ async fn main() -> Result<()> {
                     }
                 } else {
                     println!("\nDaemon ready. Use --query, --analyze, or --topic.");
-                    println!("Example: vibecheck chat --query \"What should I optimize?\"");
+                    println!("Example: vibedev chat --query \"What should I optimize?\"");
                 }
 
                 return Ok(());
@@ -1079,9 +1079,9 @@ async fn main() -> Result<()> {
             if !chat.has_model() {
                 println!("{}", "No LLM model downloaded!".red().bold());
                 println!("\nTo get started, download a model:");
-                println!("  vibecheck models download qwen-coder-1.5b  # Recommended (~3GB)");
-                println!("  vibecheck models download qwen-coder-0.5b  # Smaller (~1GB)");
-                println!("\nRun 'vibecheck models' to see all available models.");
+                println!("  vibedev models download qwen-coder-1.5b  # Recommended (~3GB)");
+                println!("  vibedev models download qwen-coder-0.5b  # Smaller (~1GB)");
+                println!("\nRun 'vibedev models' to see all available models.");
                 return Ok(());
             }
 
@@ -1141,7 +1141,7 @@ async fn main() -> Result<()> {
                 }
             } else {
                 // Interactive chat mode
-                println!("\n{}", "vibecheck AI Chat (offline)".cyan().bold());
+                println!("\n{}", "vibedev AI Chat (offline)".cyan().bold());
                 println!("Type your questions about your AI tool usage. Type 'quit' to exit.");
                 println!("Tip: Type 'topics' to see available analysis topics.\n");
 
@@ -1198,7 +1198,7 @@ async fn main() -> Result<()> {
 
                 "download" | "dl" | "get" => {
                     let id = model_id.ok_or_else(|| {
-                        anyhow::anyhow!("Please specify a model ID. Run 'vibecheck models' to see available models.")
+                        anyhow::anyhow!("Please specify a model ID. Run 'vibedev models' to see available models.")
                     })?;
 
                     match embedded_llm::download_model(&id) {
@@ -1208,7 +1208,7 @@ async fn main() -> Result<()> {
                                 "Success:".green().bold(),
                                 id
                             );
-                            println!("Run 'vibecheck models use {}' to activate it.", id);
+                            println!("Run 'vibedev models use {}' to activate it.", id);
                         }
                         Err(e) => {
                             println!("{}: {}", "Error".red().bold(), e);
@@ -1218,13 +1218,13 @@ async fn main() -> Result<()> {
 
                 "use" | "switch" | "set" => {
                     let id = model_id.ok_or_else(|| {
-                        anyhow::anyhow!("Please specify a model ID. Run 'vibecheck models' to see downloaded models.")
+                        anyhow::anyhow!("Please specify a model ID. Run 'vibedev models' to see downloaded models.")
                     })?;
 
                     let downloaded = embedded_llm::get_downloaded_models();
                     if !downloaded.contains(&id) {
                         println!("{}: Model '{}' not downloaded.", "Error".red().bold(), id);
-                        println!("Run 'vibecheck models download {}' first.", id);
+                        println!("Run 'vibedev models download {}' first.", id);
                         return Ok(());
                     }
 
@@ -1264,7 +1264,7 @@ async fn main() -> Result<()> {
                             println!("{}: Unknown model '{}'", "Error".red().bold(), id);
                         }
                     } else {
-                        println!("Please specify a model ID. Run 'vibecheck models' to see available models.");
+                        println!("Please specify a model ID. Run 'vibedev models' to see available models.");
                     }
                 }
 
@@ -1295,8 +1295,8 @@ async fn main() -> Result<()> {
                     println!("  BF16 - BFloat16 (GPU only)");
 
                     println!("\n{}", "Usage:".cyan().bold());
-                    println!("  vibecheck chat --device cuda --precision f16  # GPU with F16");
-                    println!("  vibecheck chat --device cpu --precision f32   # CPU with F32");
+                    println!("  vibedev chat --device cuda --precision f16  # GPU with F16");
+                    println!("  vibedev chat --device cpu --precision f32   # CPU with F32");
                 }
 
                 _ => {
@@ -1338,13 +1338,13 @@ async fn main() -> Result<()> {
                         println!("  Socket: {}", info.socket.display());
                     } else {
                         println!("  Status: {}", "Not running".yellow());
-                        println!("\nStart with: vibecheck daemon start");
+                        println!("\nStart with: vibedev daemon start");
                     }
                 }
 
                 "start" => {
                     if daemon::is_running() {
-                        println!("{}: Daemon already running. Use 'vibecheck daemon restart' to restart.", "Error".red().bold());
+                        println!("{}: Daemon already running. Use 'vibedev daemon restart' to restart.", "Error".red().bold());
                         return Ok(());
                     }
 

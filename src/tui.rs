@@ -208,7 +208,7 @@ fn ui(f: &mut Frame, app: &App) {
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title(" vibecheck - AI Log Analyzer "),
+                .title(" vibedev - AI Log Analyzer "),
         )
         .select(app.selected_tab)
         .style(Style::default().fg(Color::White))
@@ -530,7 +530,7 @@ pub fn print_cli_output(base_dir: PathBuf) -> Result<()> {
     use colored::Colorize;
     use std::time::Instant;
 
-    println!("{}", "vibecheck - Scanning...".cyan().bold());
+    println!("{}", "vibedev - Scanning...".cyan().bold());
     println!();
 
     let start = Instant::now();

@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-const SOCKET_NAME: &str = "vibecheck.sock";
+const SOCKET_NAME: &str = "vibedev.sock";
 
 /// Get the socket path
 pub fn get_socket_path() -> PathBuf {
@@ -23,7 +23,7 @@ pub fn get_pid_path() -> PathBuf {
     dirs::runtime_dir()
         .or_else(dirs::cache_dir)
         .unwrap_or_else(|| PathBuf::from("/tmp"))
-        .join("vibecheck.pid")
+        .join("vibedev.pid")
 }
 
 /// Check if daemon is running
@@ -41,7 +41,7 @@ pub fn is_running() -> bool {
 pub fn query(prompt: &str, context: Option<&str>) -> Result<String> {
     let socket_path = get_socket_path();
     let mut stream = UnixStream::connect(&socket_path)
-        .map_err(|_| anyhow!("Daemon not running. Start with: vibecheck daemon start"))?;
+        .map_err(|_| anyhow!("Daemon not running. Start with: vibedev daemon start"))?;
 
     // Send request as JSON
     let request = serde_json::json!({
@@ -124,7 +124,7 @@ pub fn start(
     }
 
     // Load the model
-    println!("Starting vibecheck daemon...");
+    println!("Starting vibedev daemon...");
     let llm = EmbeddedLlm::new_with_options(model_id, device_type, quantization)?;
     let llm = Arc::new(Mutex::new(llm));
 
@@ -132,7 +132,7 @@ pub fn start(
     let listener = UnixListener::bind(&socket_path)?;
     println!("Daemon listening on: {}", socket_path.display());
     println!("Model loaded and ready for queries.");
-    println!("\nUse 'vibecheck daemon stop' to stop the daemon.");
+    println!("\nUse 'vibedev daemon stop' to stop the daemon.");
 
     // Save PID
     let pid_path = get_pid_path();
