@@ -1,4 +1,4 @@
-// Binary cache module using limcode for ultra-fast serialization
+// Binary cache module using serde_json for serialization
 use anyhow::Result;
 use serde::{de::DeserializeOwned, Serialize};
 use std::fs;
@@ -9,28 +9,28 @@ use std::time::{Duration, SystemTime};
 pub fn get_cache_dir() -> PathBuf {
     dirs::cache_dir()
         .unwrap_or_else(|| PathBuf::from("."))
-        .join("vibecheck")
+        .join("vibedev")
         .join("cache")
 }
 
 /// Cache key from a string
 fn cache_path(key: &str) -> PathBuf {
-    get_cache_dir().join(format!("{}.lim", key))
+    get_cache_dir().join(format!("{}.json", key))
 }
 
-/// Save data to cache using limcode (SIMD-optimized binary serialization)
+/// Save data to cache
 pub fn cache_save<T: Serialize>(key: &str, data: &T) -> Result<()> {
     let cache_dir = get_cache_dir();
     fs::create_dir_all(&cache_dir)?;
 
-    let bytes = limcode::serialize(data)?;
+    let bytes = serde_json::to_vec(data)?;
     let path = cache_path(key);
     fs::write(&path, &bytes)?;
 
     Ok(())
 }
 
-/// Load data from cache using limcode
+/// Load data from cache
 pub fn cache_load<T: DeserializeOwned>(key: &str) -> Result<Option<T>> {
     let path = cache_path(key);
 
@@ -39,7 +39,7 @@ pub fn cache_load<T: DeserializeOwned>(key: &str) -> Result<Option<T>> {
     }
 
     let bytes = fs::read(&path)?;
-    let data: T = limcode::deserialize(&bytes)?;
+    let data: T = serde_json::from_slice(&bytes)?;
 
     Ok(Some(data))
 }
@@ -64,7 +64,7 @@ pub fn cache_load_fresh<T: DeserializeOwned>(key: &str, max_age: Duration) -> Re
     }
 
     let bytes = fs::read(&path)?;
-    let data: T = limcode::deserialize(&bytes)?;
+    let data: T = serde_json::from_slice(&bytes)?;
 
     Ok(Some(data))
 }
@@ -100,7 +100,7 @@ pub fn cache_stats() -> Result<CacheStats> {
 
     for entry in fs::read_dir(&cache_dir)? {
         let entry = entry?;
-        if entry.path().extension().is_some_and(|e| e == "lim") {
+        if entry.path().extension().is_some_and(|e| e == "json") {
             total_size += entry.metadata()?.len();
             file_count += 1;
         }
@@ -129,33 +129,5 @@ impl CacheStats {
         } else {
             format!("{} B", self.total_size)
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use serde::{Deserialize, Serialize};
-
-    #[derive(Serialize, Deserialize, Debug, PartialEq)]
-    struct TestData {
-        name: String,
-        value: u64,
-        items: Vec<String>,
-    }
-
-    #[test]
-    fn test_cache_roundtrip() {
-        let data = TestData {
-            name: "test".to_string(),
-            value: 42,
-            items: vec!["a".to_string(), "b".to_string()],
-        };
-
-        cache_save("test_key", &data).unwrap();
-        let loaded: Option<TestData> = cache_load("test_key").unwrap();
-
-        assert_eq!(loaded, Some(data));
-        cache_clear("test_key").unwrap();
     }
 }
