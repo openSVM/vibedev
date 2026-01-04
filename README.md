@@ -1,4 +1,4 @@
-# vibecheck
+# vibedev
 
 Analyze your AI coding assistant usage patterns, costs, and productivity.
 
@@ -21,13 +21,13 @@ Analyze your AI coding assistant usage patterns, costs, and productivity.
 cargo install --path .
 
 # Discover AI tool logs on your system
-vibecheck discover
+vibedev discover
 
 # Interactive TUI dashboard
-vibecheck tui
+vibedev tui
 
 # Generate analysis report
-vibecheck analyze --format html --output report.html
+vibedev analyze --format html --output report.html
 ```
 
 ## Commands
@@ -51,15 +51,15 @@ Analyze your data with a fully offline LLM - no API keys or internet required:
 
 ```bash
 # Download a model (one-time)
-vibecheck models download qwen-coder-1.5b
+vibedev models download qwen-coder-1.5b
 
 # Chat with your data
-vibecheck chat --query "What are my top productivity patterns?"
+vibedev chat --query "What are my top productivity patterns?"
 
 # Keep model loaded for fast queries
-vibecheck daemon start
-vibecheck chat --query "How can I reduce costs?"
-vibecheck daemon stop
+vibedev daemon start
+vibedev chat --query "How can I reduce costs?"
+vibedev daemon stop
 ```
 
 **Available Models:**
@@ -77,7 +77,7 @@ cargo build --release --features metal  # Apple Silicon
 ## Interactive TUI
 
 ```bash
-vibecheck tui
+vibedev tui
 ```
 
 Real-time visualization inspired by `dust`:
@@ -89,7 +89,7 @@ Real-time visualization inspired by `dust`:
 ## Analysis Report
 
 ```bash
-vibecheck analyze --output report.md
+vibedev analyze --output report.md
 ```
 
 **Sample output:**
@@ -135,7 +135,7 @@ vibecheck analyze --output report.md
 Create sanitized datasets for fine-tuning:
 
 ```bash
-vibecheck prepare --output ~/datasets
+vibedev prepare --output ~/datasets
 ```
 
 **Sanitization removes:**
@@ -150,10 +150,10 @@ See [PREPARE_GUIDE.md](PREPARE_GUIDE.md) for details.
 ## Build from Source
 
 ```bash
-git clone https://github.com/openSVM/vibecheck.git
-cd vibecheck
+git clone https://github.com/openSVM/vibedev.git
+cd vibedev
 cargo build --release
-./target/release/vibecheck --help
+./target/release/vibedev --help
 ```
 
 **Requirements:**
@@ -162,17 +162,17 @@ cargo build --release
 
 ## Configuration
 
-vibecheck works out of the box with no configuration. Optional settings:
+vibedev works out of the box with no configuration. Optional settings:
 
 ```bash
 # Filter to specific tool
-vibecheck analyze --tool claude
+vibedev analyze --tool claude
 
 # Time range
-vibecheck analyze --days 30
+vibedev analyze --days 30
 
 # Output format
-vibecheck analyze --format json --output data.json
+vibedev analyze --format json --output data.json
 ```
 
 ## Contributing
@@ -184,7 +184,7 @@ Contributions welcome! Please read the code of conduct and submit PRs.
 cargo test
 
 # Run with debug logging
-vibecheck --verbose analyze
+vibedev --verbose analyze
 ```
 
 ## License

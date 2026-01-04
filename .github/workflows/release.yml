@@ -40,21 +40,21 @@ jobs:
         if: runner.os != 'Windows'
         run: |
           cd target/${{ matrix.target }}/release
-          tar czvf ../../../vibecheck-${{ matrix.target }}.tar.gz vibecheck
+          tar czvf ../../../vibedev-${{ matrix.target }}.tar.gz vibedev
           cd ../../..
 
       - name: Package (Windows)
         if: runner.os == 'Windows'
         run: |
           cd target/${{ matrix.target }}/release
-          7z a ../../../vibecheck-${{ matrix.target }}.zip vibecheck.exe
+          7z a ../../../vibedev-${{ matrix.target }}.zip vibedev.exe
           cd ../../..
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: vibecheck-${{ matrix.target }}
-          path: vibecheck-${{ matrix.target }}.*
+          name: vibedev-${{ matrix.target }}
+          path: vibedev-${{ matrix.target }}.*
 
   publish-crates:
     name: Publish to crates.io

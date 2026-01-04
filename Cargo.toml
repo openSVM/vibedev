@@ -1,12 +1,12 @@
 [package]
-name = "vibecheck"
+name = "vibedev"
 version = "0.1.0"
 edition = "2021"
 description = "Analyze AI coding assistant usage patterns, costs, and productivity"
 license = "MIT"
-repository = "https://github.com/openSVM/vibecheck"
-homepage = "https://github.com/openSVM/vibecheck"
-documentation = "https://github.com/openSVM/vibecheck#readme"
+repository = "https://github.com/openSVM/vibedev"
+homepage = "https://github.com/openSVM/vibedev"
+documentation = "https://github.com/openSVM/vibedev#readme"
 readme = "README.md"
 keywords = ["ai", "coding", "analytics", "claude", "cursor"]
 categories = ["command-line-utilities", "development-tools"]
@@ -89,5 +89,5 @@ tempfile = "3.12"
 criterion = "0.5"
 
 [[bin]]
-name = "vibecheck"
+name = "vibedev"
 path = "src/main.rs"
