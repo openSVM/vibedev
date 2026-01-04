@@ -11,7 +11,7 @@ readme = "README.md"
 keywords = ["ai", "coding", "analytics", "claude", "cursor"]
 categories = ["command-line-utilities", "development-tools"]
 authors = ["Rin Fhenzig <rin@opensvm.com>"]
-rust-version = "1.70"
+rust-version = "1.82"
 
 [dependencies]
 # Core

@@ -1344,7 +1344,10 @@ async fn main() -> Result<()> {
 
                 "start" => {
                     if daemon::is_running() {
-                        println!("{}: Daemon already running. Use 'vibedev daemon restart' to restart.", "Error".red().bold());
+                        println!(
+                            "{}: Daemon already running. Use 'vibedev daemon restart' to restart.",
+                            "Error".red().bold()
+                        );
                         return Ok(());
                     }
 

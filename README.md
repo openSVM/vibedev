@@ -3,7 +3,7 @@
 Analyze your AI coding assistant usage patterns, costs, and productivity.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Rust](https://img.shields.io/badge/rust-1.70+-orange.svg)](https://www.rust-lang.org/)
+[![Rust](https://img.shields.io/badge/rust-1.82+-orange.svg)](https://www.rust-lang.org/)
 
 ## Features
 
@@ -157,7 +157,7 @@ cargo build --release
 ```
 
 **Requirements:**
-- Rust 1.70+
+- Rust 1.82+
 - ~8MB binary size
 
 ## Configuration
