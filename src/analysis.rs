@@ -206,8 +206,13 @@ impl Analyzer {
                     category: RecommendationCategory::Performance,
                     priority: Priority::Medium,
                     title: format!("High usage detected for {}", tool_name),
-                    description: format!("{} has {} prompts - consider reviewing for patterns", tool_name, analysis.prompt_count),
-                    action: "Run 'vibecheck insights' to analyze usage patterns and optimize workflows".to_string(),
+                    description: format!(
+                        "{} has {} prompts - consider reviewing for patterns",
+                        tool_name, analysis.prompt_count
+                    ),
+                    action:
+                        "Run 'vibecheck insights' to analyze usage patterns and optimize workflows"
+                            .to_string(),
                     estimated_savings: None,
                     effort: Effort::Minutes,
                 });
@@ -261,8 +266,7 @@ impl Analyzer {
                     "You're using {} different AI tools - consider consolidating",
                     tools.len()
                 ),
-                action: "Run 'vibecheck compare' to see which tools are most effective"
-                    .to_string(),
+                action: "Run 'vibecheck compare' to see which tools are most effective".to_string(),
                 estimated_savings: None,
                 effort: Effort::Hours,
             });

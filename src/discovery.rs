@@ -165,7 +165,10 @@ impl LogDiscovery {
         let tools_found = tools_mutex.into_inner().unwrap();
 
         // Additional scan for logs in common locations
-        self.scan_logs_directory(&mut locations, &mut tools_found.clone().into_iter().collect())?;
+        self.scan_logs_directory(
+            &mut locations,
+            &mut tools_found.clone().into_iter().collect(),
+        )?;
 
         let total_size_bytes = locations.iter().map(|l| l.size_bytes).sum();
         let total_files = locations.iter().map(|l| l.file_count).sum();

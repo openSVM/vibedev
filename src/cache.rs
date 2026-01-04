@@ -55,7 +55,9 @@ pub fn cache_load_fresh<T: DeserializeOwned>(key: &str, max_age: Duration) -> Re
     // Check age
     let metadata = fs::metadata(&path)?;
     let modified = metadata.modified()?;
-    let age = SystemTime::now().duration_since(modified).unwrap_or(Duration::MAX);
+    let age = SystemTime::now()
+        .duration_since(modified)
+        .unwrap_or(Duration::MAX);
 
     if age > max_age {
         return Ok(None);
@@ -98,7 +100,7 @@ pub fn cache_stats() -> Result<CacheStats> {
 
     for entry in fs::read_dir(&cache_dir)? {
         let entry = entry?;
-        if entry.path().extension().map_or(false, |e| e == "lim") {
+        if entry.path().extension().is_some_and(|e| e == "lim") {
             total_size += entry.metadata()?.len();
             file_count += 1;
         }

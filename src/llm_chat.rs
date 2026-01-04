@@ -1,5 +1,7 @@
 // LLM Chat module - Embedded offline LLM with model selection
-use crate::embedded_llm::{DeviceType, EmbeddedLlm, Quantization, get_current_model, get_downloaded_models};
+use crate::embedded_llm::{
+    get_current_model, get_downloaded_models, DeviceType, EmbeddedLlm, Quantization,
+};
 use anyhow::Result;
 use std::collections::HashMap;
 
@@ -103,7 +105,12 @@ Help analyze usage patterns and suggest optimizations."#,
 
         for (name, size) in sorted {
             let pct = (*size as f64 / total_size as f64) * 100.0;
-            summary.push_str(&format!("- {}: {} ({:.1}%)\n", name, format_bytes(*size), pct));
+            summary.push_str(&format!(
+                "- {}: {} ({:.1}%)\n",
+                name,
+                format_bytes(*size),
+                pct
+            ));
         }
 
         summary
@@ -164,10 +171,19 @@ fn format_bytes(bytes: u64) -> String {
 
 /// Predefined analysis prompts
 pub const ANALYSIS_PROMPTS: &[(&str, &str)] = &[
-    ("overview", "Give me a high-level overview of my AI tool usage"),
+    (
+        "overview",
+        "Give me a high-level overview of my AI tool usage",
+    ),
     ("storage", "How can I reduce my AI tool storage usage?"),
     ("patterns", "What usage patterns do you see in my data?"),
     ("compare", "Compare my usage across different AI tools"),
-    ("optimize", "How can I optimize my AI-assisted coding workflow?"),
-    ("cleanup", "What files/logs can I safely delete to free space?"),
+    (
+        "optimize",
+        "How can I optimize my AI-assisted coding workflow?",
+    ),
+    (
+        "cleanup",
+        "What files/logs can I safely delete to free space?",
+    ),
 ];

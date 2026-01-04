@@ -20,16 +20,16 @@ mod sanitizer;
 mod viral_insights;
 mod work_hours_analyzer;
 // mod infographics;  // Temporarily disabled due to compilation errors
+mod cache;
+mod daemon;
 mod dataset_extractor;
 mod deep_insights;
+mod embedded_llm;
 mod extraction_utils;
 mod extractors;
 mod html_report;
-mod report_analyzer;
-mod cache;
-mod daemon;
-mod embedded_llm;
 mod llm_chat;
+mod report_analyzer;
 mod tui;
 mod ultra_deep;
 
@@ -978,7 +978,16 @@ async fn main() -> Result<()> {
             Ok(())
         }
 
-        Commands::Chat { model, query, analyze, topic, list_topics, with_data, device, precision } => {
+        Commands::Chat {
+            model,
+            query,
+            analyze,
+            topic,
+            list_topics,
+            with_data,
+            device,
+            precision,
+        } => {
             use colored::Colorize;
             use embedded_llm::{DeviceType, Quantization};
 
@@ -1033,24 +1042,32 @@ async fn main() -> Result<()> {
 
             // Parse device type
             let device_type = match device.to_lowercase().as_str() {
-                "auto" => None,  // Let it auto-detect
+                "auto" => None, // Let it auto-detect
                 "cpu" => Some(DeviceType::Cpu),
                 "cuda" | "gpu" => Some(DeviceType::Cuda(0)),
                 "metal" => Some(DeviceType::Metal),
                 _ => {
-                    println!("{}: Unknown device '{}'. Use: auto, cpu, cuda, metal", "Error".red(), device);
+                    println!(
+                        "{}: Unknown device '{}'. Use: auto, cpu, cuda, metal",
+                        "Error".red(),
+                        device
+                    );
                     return Ok(());
                 }
             };
 
             // Parse precision/quantization
             let quantization = match precision.to_lowercase().as_str() {
-                "auto" => None,  // Let it auto-select based on device
+                "auto" => None, // Let it auto-select based on device
                 "f32" | "fp32" => Some(Quantization::F32),
                 "f16" | "fp16" => Some(Quantization::F16),
                 "bf16" => Some(Quantization::BF16),
                 _ => {
-                    println!("{}: Unknown precision '{}'. Use: auto, f32, f16, bf16", "Error".red(), precision);
+                    println!(
+                        "{}: Unknown precision '{}'. Use: auto, f32, f16, bf16",
+                        "Error".red(),
+                        precision
+                    );
                     return Ok(());
                 }
             };
@@ -1082,7 +1099,9 @@ async fn main() -> Result<()> {
 
                 let mut tool_sizes = std::collections::HashMap::new();
                 for loc in &findings.locations {
-                    *tool_sizes.entry(loc.tool.name().to_string()).or_insert(0u64) += loc.size_bytes;
+                    *tool_sizes
+                        .entry(loc.tool.name().to_string())
+                        .or_insert(0u64) += loc.size_bytes;
                 }
 
                 llm_chat::LlmChat::generate_context(
@@ -1105,7 +1124,11 @@ async fn main() -> Result<()> {
                 }
             } else if let Some(t) = topic {
                 // Topic-specific recommendations
-                println!("\n{}: {}\n", "Getting recommendations for".cyan(), t.yellow());
+                println!(
+                    "\n{}: {}\n",
+                    "Getting recommendations for".cyan(),
+                    t.yellow()
+                );
                 match chat.get_recommendations(&t).await {
                     Ok(response) => println!("{}", response),
                     Err(e) => println!("{}: {}", "Error".red(), e),
@@ -1134,7 +1157,8 @@ async fn main() -> Result<()> {
                     stdin.read_line(&mut input)?;
                     let trimmed = input.trim();
 
-                    if trimmed.eq_ignore_ascii_case("quit") || trimmed.eq_ignore_ascii_case("exit") {
+                    if trimmed.eq_ignore_ascii_case("quit") || trimmed.eq_ignore_ascii_case("exit")
+                    {
                         break;
                     }
 
@@ -1179,7 +1203,11 @@ async fn main() -> Result<()> {
 
                     match embedded_llm::download_model(&id) {
                         Ok(_) => {
-                            println!("\n{} Model '{}' downloaded successfully!", "Success:".green().bold(), id);
+                            println!(
+                                "\n{} Model '{}' downloaded successfully!",
+                                "Success:".green().bold(),
+                                id
+                            );
                             println!("Run 'vibecheck models use {}' to activate it.", id);
                         }
                         Err(e) => {
@@ -1205,9 +1233,8 @@ async fn main() -> Result<()> {
                 }
 
                 "remove" | "rm" | "delete" => {
-                    let id = model_id.ok_or_else(|| {
-                        anyhow::anyhow!("Please specify a model ID to remove.")
-                    })?;
+                    let id = model_id
+                        .ok_or_else(|| anyhow::anyhow!("Please specify a model ID to remove."))?;
 
                     let model_dir = embedded_llm::get_models_dir().join(&id);
                     if model_dir.exists() {
@@ -1249,12 +1276,18 @@ async fn main() -> Result<()> {
                     #[cfg(feature = "cuda")]
                     println!("  CUDA: {} (feature enabled)", "Available".green());
                     #[cfg(not(feature = "cuda"))]
-                    println!("  CUDA: {} (rebuild with --features cuda)", "Not enabled".yellow());
+                    println!(
+                        "  CUDA: {} (rebuild with --features cuda)",
+                        "Not enabled".yellow()
+                    );
 
                     #[cfg(feature = "metal")]
                     println!("  Metal: {} (feature enabled)", "Available".green());
                     #[cfg(not(feature = "metal"))]
-                    println!("  Metal: {} (rebuild with --features metal)", "Not enabled".yellow());
+                    println!(
+                        "  Metal: {} (rebuild with --features metal)",
+                        "Not enabled".yellow()
+                    );
 
                     println!("\n{}", "Quantization Options:".cyan().bold());
                     println!("  F32  - Full precision (default for CPU)");
@@ -1281,7 +1314,12 @@ async fn main() -> Result<()> {
             Ok(())
         }
 
-        Commands::Daemon { action, model, device, precision } => {
+        Commands::Daemon {
+            action,
+            model,
+            device,
+            precision,
+        } => {
             use colored::Colorize;
             use embedded_llm::{DeviceType, Quantization};
 

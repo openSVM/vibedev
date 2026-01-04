@@ -15,17 +15,17 @@ const MAX_TOKENS: usize = 512;
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum DeviceType {
     Cpu,
-    Cuda(usize),  // GPU index
+    Cuda(usize), // GPU index
     Metal,
 }
 
 /// Quantization level
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Quantization {
-    F32,    // Full precision (default)
-    F16,    // Half precision
-    BF16,   // BFloat16
-    // Note: INT8/INT4 require GGUF format, not yet supported
+    F32, // Full precision (default)
+    F16, // Half precision
+    BF16, // BFloat16
+         // Note: INT8/INT4 require GGUF format, not yet supported
 }
 
 /// Detect best available device
@@ -61,7 +61,9 @@ pub fn get_device(device_type: DeviceType) -> Result<Device> {
             #[cfg(not(feature = "cuda"))]
             {
                 let _ = idx;
-                Err(anyhow!("CUDA not enabled. Rebuild with: cargo build --features cuda"))
+                Err(anyhow!(
+                    "CUDA not enabled. Rebuild with: cargo build --features cuda"
+                ))
             }
         }
         DeviceType::Metal => {
@@ -71,7 +73,9 @@ pub fn get_device(device_type: DeviceType) -> Result<Device> {
             }
             #[cfg(not(feature = "metal"))]
             {
-                Err(anyhow!("Metal not enabled. Rebuild with: cargo build --features metal"))
+                Err(anyhow!(
+                    "Metal not enabled. Rebuild with: cargo build --features metal"
+                ))
             }
         }
     }
@@ -85,7 +89,7 @@ pub fn get_dtype(quant: Quantization, device: &Device) -> DType {
         Quantization::BF16 => {
             // BF16 not supported on all devices
             if device.is_cpu() {
-                DType::F32  // Fallback
+                DType::F32 // Fallback
             } else {
                 DType::BF16
             }
@@ -208,10 +212,13 @@ pub fn get_downloaded_models() -> Vec<String> {
 
 /// Download a model
 pub fn download_model(model_id: &str) -> Result<PathBuf> {
-    let model_info = get_model_info(model_id)
-        .ok_or_else(|| anyhow!("Unknown model: {}", model_id))?;
+    let model_info =
+        get_model_info(model_id).ok_or_else(|| anyhow!("Unknown model: {}", model_id))?;
 
-    println!("Downloading {} (~{:.1}GB)...", model_info.name, model_info.size_gb);
+    println!(
+        "Downloading {} (~{:.1}GB)...",
+        model_info.name, model_info.size_gb
+    );
     println!("  From: {}", model_info.hf_repo);
 
     let api = Api::new()?;
@@ -254,7 +261,10 @@ pub fn list_models() {
     let current = get_current_model();
 
     println!("\nAvailable Models:\n");
-    println!("{:<20} {:<8} {:<8} {:<10} {}", "ID", "Params", "Size", "Status", "Description");
+    println!(
+        "{:<20} {:<8} {:<8} {:<10} Description",
+        "ID", "Params", "Size", "Status"
+    );
     println!("{}", "-".repeat(80));
 
     for model in AVAILABLE_MODELS {
@@ -312,15 +322,20 @@ impl EmbeddedLlm {
             .or_else(get_current_model)
             .unwrap_or_else(|| "qwen-coder-1.5b".to_string());
 
-        let model_info = get_model_info(&model_id)
-            .ok_or_else(|| anyhow!("Unknown model: {}. Run 'vibecheck models' to see available models.", model_id))?;
+        let model_info = get_model_info(&model_id).ok_or_else(|| {
+            anyhow!(
+                "Unknown model: {}. Run 'vibecheck models' to see available models.",
+                model_id
+            )
+        })?;
 
         // Check if downloaded
         let downloaded = get_downloaded_models();
         if !downloaded.contains(&model_id) {
             return Err(anyhow!(
                 "Model '{}' not downloaded. Run: vibecheck models download {}",
-                model_id, model_id
+                model_id,
+                model_id
             ));
         }
 
@@ -329,10 +344,10 @@ impl EmbeddedLlm {
         let device = get_device(device_type)?;
 
         // Default quantization based on device
-        let quant = quantization.unwrap_or_else(|| {
+        let quant = quantization.unwrap_or({
             match device_type {
                 DeviceType::Cpu => Quantization::F32,
-                DeviceType::Cuda(_) => Quantization::F16,  // GPU benefits from F16
+                DeviceType::Cuda(_) => Quantization::F16, // GPU benefits from F16
                 DeviceType::Metal => Quantization::F16,
             }
         });
@@ -377,9 +392,7 @@ impl EmbeddedLlm {
             return Err(anyhow!("No model weights found"));
         }
 
-        let vb = unsafe {
-            VarBuilder::from_mmaped_safetensors(&weights_files, dtype, &device)?
-        };
+        let vb = unsafe { VarBuilder::from_mmaped_safetensors(&weights_files, dtype, &device)? };
 
         println!("  Building model...");
         let model = Qwen2::new(&config, vb)?;
@@ -470,9 +483,6 @@ impl EmbeddedLlm {
 
     /// Get recommendations for a specific topic
     pub fn get_recommendations(&mut self, topic: &str) -> Result<String> {
-        self.generate(&format!(
-            "Give me specific recommendations for: {}",
-            topic
-        ))
+        self.generate(&format!("Give me specific recommendations for: {}", topic))
     }
 }

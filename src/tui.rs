@@ -62,7 +62,10 @@ impl App {
         // Calculate per-tool sizes
         self.tool_sizes.clear();
         for loc in &findings.locations {
-            *self.tool_sizes.entry(loc.tool.name().to_string()).or_insert(0) += loc.size_bytes;
+            *self
+                .tool_sizes
+                .entry(loc.tool.name().to_string())
+                .or_insert(0) += loc.size_bytes;
         }
 
         let elapsed = self.start_time.elapsed();
@@ -81,7 +84,11 @@ impl App {
     }
 
     pub fn prev_tab(&mut self) {
-        self.selected_tab = if self.selected_tab == 0 { 3 } else { self.selected_tab - 1 };
+        self.selected_tab = if self.selected_tab == 0 {
+            3
+        } else {
+            self.selected_tab - 1
+        };
         self.selected_row = 0;
     }
 
@@ -319,7 +326,9 @@ fn render_tools(f: &mut Frame, app: &App, area: Rect) {
         return;
     };
 
-    let mut tool_items: Vec<(String, u64)> = app.tool_sizes.iter()
+    let mut tool_items: Vec<(String, u64)> = app
+        .tool_sizes
+        .iter()
         .map(|(k, v)| (k.clone(), *v))
         .collect();
     tool_items.sort_by(|a, b| b.1.cmp(&a.1));
@@ -431,8 +440,14 @@ fn render_charts(f: &mut Frame, app: &App, area: Rect) {
         findings.total_files,
         findings.tools_found.len(),
         findings.locations.len(),
-        tool_data.first().map(|(n, s)| format!("{} ({})", n, format_bytes(**s))).unwrap_or_default(),
-        tool_data.last().map(|(n, s)| format!("{} ({})", n, format_bytes(**s))).unwrap_or_default(),
+        tool_data
+            .first()
+            .map(|(n, s)| format!("{} ({})", n, format_bytes(**s)))
+            .unwrap_or_default(),
+        tool_data
+            .last()
+            .map(|(n, s)| format!("{} ({})", n, format_bytes(**s)))
+            .unwrap_or_default(),
     );
 
     let summary = Paragraph::new(summary_text)
@@ -468,8 +483,10 @@ fn render_details(f: &mut Frame, app: &App, area: Rect) {
             loc.path.display(),
             format_bytes(loc.size_bytes),
             loc.file_count,
-            loc.oldest_entry.map(|d| d.format("%Y-%m-%d %H:%M").to_string()),
-            loc.newest_entry.map(|d| d.format("%Y-%m-%d %H:%M").to_string()),
+            loc.oldest_entry
+                .map(|d| d.format("%Y-%m-%d %H:%M").to_string()),
+            loc.newest_entry
+                .map(|d| d.format("%Y-%m-%d %H:%M").to_string()),
         )
     } else {
         "No location selected".to_string()
@@ -580,16 +597,19 @@ pub fn print_cli_output(base_dir: PathBuf) -> Result<()> {
         "  Total Storage:  {}",
         format_bytes(findings.total_size_bytes).yellow().bold()
     );
-    println!("  Total Files:    {}", findings.total_files.to_string().cyan());
+    println!(
+        "  Total Files:    {}",
+        findings.total_files.to_string().cyan()
+    );
     println!(
         "  Tools Found:    {}",
         findings.tools_found.len().to_string().cyan()
     );
-    println!("  Locations:      {}", findings.locations.len().to_string().cyan());
     println!(
-        "  Scan Time:      {:.2}s",
-        elapsed.as_secs_f64()
+        "  Locations:      {}",
+        findings.locations.len().to_string().cyan()
     );
+    println!("  Scan Time:      {:.2}s", elapsed.as_secs_f64());
 
     // Top locations
     println!();

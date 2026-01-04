@@ -13,7 +13,7 @@ const SOCKET_NAME: &str = "vibecheck.sock";
 /// Get the socket path
 pub fn get_socket_path() -> PathBuf {
     dirs::runtime_dir()
-        .or_else(|| dirs::cache_dir())
+        .or_else(dirs::cache_dir)
         .unwrap_or_else(|| PathBuf::from("/tmp"))
         .join(SOCKET_NAME)
 }
@@ -21,7 +21,7 @@ pub fn get_socket_path() -> PathBuf {
 /// Get the PID file path
 pub fn get_pid_path() -> PathBuf {
     dirs::runtime_dir()
-        .or_else(|| dirs::cache_dir())
+        .or_else(dirs::cache_dir)
         .unwrap_or_else(|| PathBuf::from("/tmp"))
         .join("vibecheck.pid")
 }
@@ -72,8 +72,8 @@ pub fn query(prompt: &str, context: Option<&str>) -> Result<String> {
 /// Get daemon status
 pub fn status() -> Result<String> {
     let socket_path = get_socket_path();
-    let mut stream = UnixStream::connect(&socket_path)
-        .map_err(|_| anyhow!("Daemon not running"))?;
+    let mut stream =
+        UnixStream::connect(&socket_path).map_err(|_| anyhow!("Daemon not running"))?;
 
     let request = serde_json::json!({ "type": "status" });
     writeln!(stream, "{}", request)?;
@@ -235,7 +235,10 @@ pub fn info() -> DaemonInfo {
         if let Ok(status) = serde_json::from_str::<serde_json::Value>(&status_str) {
             return DaemonInfo {
                 running: true,
-                model: status.get("model").and_then(|m| m.as_str()).map(String::from),
+                model: status
+                    .get("model")
+                    .and_then(|m| m.as_str())
+                    .map(String::from),
                 pid: status.get("pid").and_then(|p| p.as_u64()).map(|p| p as u32),
                 socket,
             };
