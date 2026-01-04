@@ -41,10 +41,42 @@ vibedev analyze --format html --output report.html
 | `chat` | Chat with your data using embedded LLM |
 | `daemon` | Keep LLM loaded for fast queries |
 | `models` | Manage offline LLM models |
+| `claude` | Manage Claude Code provider configuration |
 | `backup` | Create compressed backup archive |
 | `prepare` | Export sanitized training dataset |
 | `insights` | Comprehensive HTML dashboard |
 | `compare` | Compare usage across tools |
+
+## Claude Provider Management
+
+Switch between different API providers for Claude Code:
+
+```bash
+# List all supported providers
+vibedev claude list
+
+# Show current configuration
+vibedev claude show
+
+# Set a provider (saves configuration)
+vibedev claude set z.ai --api-key sk-xxx
+vibedev claude set openrouter --api-key sk-or-xxx
+vibedev claude set chatgpt --api-key sk-xxx
+vibedev claude set litellm --api-key sk-xxx
+
+# Apply configuration to Claude Code (updates config files)
+vibedev claude set openrouter --api-key sk-or-xxx --apply
+
+# Custom provider with custom endpoint
+vibedev claude set custom --endpoint https://api.example.com/v1 --model gpt-4 --api-key xxx --apply
+```
+
+**Supported Providers:**
+- **z.ai** - High-performance Claude API proxy
+- **openrouter** - Unified LLM API with multiple models
+- **chatgpt** - OpenAI GPT-4 and other OpenAI models
+- **litellm** - Local proxy for multiple providers
+- **custom** - Your own custom endpoint
 
 ## Embedded LLM (Offline)
 
