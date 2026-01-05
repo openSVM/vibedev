@@ -3,6 +3,7 @@ use crate::analyzer::ConversationAnalyzer;
 use crate::claude_code_parser::ClaudeCodeParser;
 use crate::discovery::LogDiscovery;
 use crate::models::DiscoveryFindings;
+use crate::timeline::{Timeline, TimelineAnalyzer};
 use crate::viral_insights::{ViralAnalyzer, ViralInsights};
 use anyhow::Result;
 use crossterm::{
@@ -64,6 +65,7 @@ impl MetricsHistory {
 pub struct App {
     pub findings: Option<DiscoveryFindings>,
     pub insights: Option<ViralInsights>,
+    pub timeline: Option<Timeline>,
     pub base_dir: PathBuf,
     pub tool_sizes: HashMap<String, u64>,
     pub estimated_tokens: u64,
@@ -77,6 +79,7 @@ pub struct App {
     pub hourly_activity: [u64; 24],
     pub start_time: Instant,
     pub current_branch: String,
+    pub scroll_offset: usize,
 }
 
 impl App {
@@ -84,6 +87,7 @@ impl App {
         Self {
             findings: None,
             insights: None,
+            timeline: None,
             base_dir,
             tool_sizes: HashMap::new(),
             estimated_tokens: 0,
@@ -97,6 +101,7 @@ impl App {
             hourly_activity: [0; 24],
             start_time: Instant::now(),
             current_branch: String::new(),
+            scroll_offset: 0,
         }
     }
 
@@ -184,6 +189,12 @@ impl App {
             }
             self.insights = Some(insights);
         }
+
+        // Load timeline
+        let timeline_analyzer = TimelineAnalyzer::new(self.base_dir.clone());
+        if let Ok(timeline) = timeline_analyzer.analyze() {
+            self.timeline = Some(timeline);
+        }
     }
 
     pub fn toggle_pause(&mut self) {
@@ -191,15 +202,25 @@ impl App {
     }
 
     pub fn next_tab(&mut self) {
-        self.selected_tab = (self.selected_tab + 1) % 3;
+        self.selected_tab = (self.selected_tab + 1) % 4;
     }
 
     pub fn prev_tab(&mut self) {
         self.selected_tab = if self.selected_tab == 0 {
-            2
+            3
         } else {
             self.selected_tab - 1
         };
+    }
+
+    pub fn scroll_up(&mut self) {
+        if self.scroll_offset > 0 {
+            self.scroll_offset -= 1;
+        }
+    }
+
+    pub fn scroll_down(&mut self) {
+        self.scroll_offset += 1;
     }
 
     fn get_cost_trend(&self) -> (f64, &'static str) {
@@ -256,6 +277,9 @@ fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, app: &mut A
                         KeyCode::Char('1') => app.selected_tab = 0,
                         KeyCode::Char('2') => app.selected_tab = 1,
                         KeyCode::Char('3') => app.selected_tab = 2,
+                        KeyCode::Char('4') => app.selected_tab = 3,
+                        KeyCode::Up => app.scroll_up(),
+                        KeyCode::Down => app.scroll_down(),
                         _ => {}
                     }
                 }
@@ -285,6 +309,7 @@ fn ui(f: &mut Frame, app: &App) {
         0 => render_overview(f, app, chunks[1]),
         1 => render_analysis(f, app, chunks[1]),
         2 => render_tools(f, app, chunks[1]),
+        3 => render_timeline(f, app, chunks[1]),
         _ => {}
     }
 
@@ -292,7 +317,7 @@ fn ui(f: &mut Frame, app: &App) {
 }
 
 fn render_header(f: &mut Frame, app: &App, area: Rect) {
-    let titles = vec!["[1] Overview", "[2] Analysis", "[3] Tools"];
+    let titles = vec!["[1] Overview", "[2] Analysis", "[3] Tools", "[4] Timeline"];
 
     let title = if app.current_branch.is_empty() {
         " vibecheck ".to_string()
@@ -652,6 +677,135 @@ fn render_tools(f: &mut Frame, app: &App, area: Rect) {
     );
 
     f.render_widget(table, area);
+}
+
+fn render_timeline(f: &mut Frame, app: &App, area: Rect) {
+    let Some(ref timeline) = app.timeline else {
+        let placeholder = Paragraph::new("  Analyzing your coding journey...")
+            .block(Block::default().borders(Borders::ALL).title(" Timeline "));
+        f.render_widget(placeholder, area);
+        return;
+    };
+
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(12), Constraint::Min(10)])
+        .split(area);
+
+    // Stats box
+    let stats_lines = vec![
+        Line::from(""),
+        Line::from(vec![
+            Span::raw("  Total Sessions:   "),
+            Span::styled(format!("{}", timeline.stats.total_sessions), Style::default().fg(Color::Cyan).bold()),
+        ]),
+        Line::from(vec![
+            Span::raw("  Completed:        "),
+            Span::styled(format!("{}", timeline.stats.completed), Style::default().fg(Color::Green).bold()),
+            Span::raw(format!(" ({:.0}%)", timeline.stats.completion_rate)),
+        ]),
+        Line::from(vec![
+            Span::raw("  Abandoned:        "),
+            Span::styled(format!("{}", timeline.stats.abandoned), Style::default().fg(Color::Red).bold()),
+        ]),
+        Line::from(vec![
+            Span::raw("  Ongoing:          "),
+            Span::styled(format!("{}", timeline.stats.ongoing), Style::default().fg(Color::Yellow).bold()),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::raw("  Avg Session:      "),
+            Span::styled(format!("{:.1}h", timeline.stats.avg_session_hours), Style::default().fg(Color::Magenta)),
+        ]),
+        Line::from(vec![
+            Span::raw("  Context Switches: "),
+            Span::styled(format!("{}", timeline.stats.context_switches), Style::default().fg(Color::Yellow)),
+        ]),
+        Line::from(vec![
+            Span::raw("  Most Worked:      "),
+            Span::styled(&timeline.stats.most_worked_project, Style::default().fg(Color::Cyan)),
+        ]),
+    ];
+
+    let stats_box = Paragraph::new(stats_lines)
+        .block(Block::default().borders(Borders::ALL).title(" Your Coding Journey Stats "));
+    f.render_widget(stats_box, chunks[0]);
+
+    // Timeline visualization
+    let mut timeline_lines = vec![
+        Line::from(""),
+    ];
+
+    let visible_sessions: Vec<_> = timeline.sessions
+        .iter()
+        .skip(app.scroll_offset)
+        .take(20)
+        .collect();
+
+    if visible_sessions.is_empty() {
+        timeline_lines.push(Line::from(vec![
+            Span::raw("  "),
+            Span::styled("No sessions found", Style::default().fg(Color::DarkGray)),
+        ]));
+    } else {
+        for session in &visible_sessions {
+            let outcome_color = match session.outcome {
+                crate::timeline::SessionOutcome::Completed => Color::Green,
+                crate::timeline::SessionOutcome::Abandoned => Color::Red,
+                crate::timeline::SessionOutcome::Resumed(_) => Color::Yellow,
+                crate::timeline::SessionOutcome::Ongoing => Color::Cyan,
+            };
+
+            // Timeline bar length based on hours
+            let bar_len = (session.hours * 2.0).min(40.0) as usize;
+            let bar = "━".repeat(bar_len.max(1));
+
+            timeline_lines.push(Line::from(vec![
+                Span::styled(session.start.format("%Y-%m-%d").to_string(), Style::default().fg(Color::DarkGray)),
+                Span::raw("  "),
+                Span::styled("●", Style::default().fg(outcome_color)),
+                Span::styled(bar, Style::default().fg(outcome_color)),
+                Span::styled(session.outcome.symbol().to_string(), Style::default().fg(outcome_color).bold()),
+                Span::raw("  "),
+                Span::styled(session.description.clone(), Style::default().fg(Color::White)),
+            ]));
+
+            timeline_lines.push(Line::from(vec![
+                Span::raw("            "),
+                Span::styled(
+                    format!("{:.1}h | {} convos | {}",
+                        session.hours,
+                        session.conversations,
+                        session.outcome.description()
+                    ),
+                    Style::default().fg(Color::DarkGray)
+                ),
+            ]));
+            timeline_lines.push(Line::from(""));
+        }
+    }
+
+    if app.scroll_offset > 0 {
+        timeline_lines.insert(1, Line::from(vec![
+            Span::raw("  "),
+            Span::styled("↑ Scroll up for more ↑", Style::default().fg(Color::Yellow)),
+        ]));
+    }
+
+    if app.scroll_offset + 20 < timeline.sessions.len() {
+        timeline_lines.push(Line::from(vec![
+            Span::raw("  "),
+            Span::styled("↓ Scroll down for more ↓", Style::default().fg(Color::Yellow)),
+        ]));
+    }
+
+    let timeline_para = Paragraph::new(timeline_lines)
+        .block(Block::default().borders(Borders::ALL).title(format!(
+            " Timeline ({}/{}) ",
+            app.scroll_offset + visible_sessions.len().min(20),
+            timeline.sessions.len()
+        )));
+    f.render_widget(timeline_para, chunks[1]);
 }
 
 fn format_bytes(bytes: u64) -> String {

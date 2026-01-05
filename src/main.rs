@@ -23,6 +23,7 @@ mod work_hours_analyzer;
 // mod infographics;  // Temporarily disabled due to compilation errors
 mod cache;
 mod daemon;
+mod timeline;
 mod dataset_extractor;
 mod deep_insights;
 mod embedded_llm;
