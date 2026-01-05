@@ -202,12 +202,12 @@ impl App {
     }
 
     pub fn next_tab(&mut self) {
-        self.selected_tab = (self.selected_tab + 1) % 4;
+        self.selected_tab = (self.selected_tab + 1) % 5;
     }
 
     pub fn prev_tab(&mut self) {
         self.selected_tab = if self.selected_tab == 0 {
-            3
+            4
         } else {
             self.selected_tab - 1
         };
@@ -278,6 +278,7 @@ fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, app: &mut A
                         KeyCode::Char('2') => app.selected_tab = 1,
                         KeyCode::Char('3') => app.selected_tab = 2,
                         KeyCode::Char('4') => app.selected_tab = 3,
+                        KeyCode::Char('5') => app.selected_tab = 4,
                         KeyCode::Up => app.scroll_up(),
                         KeyCode::Down => app.scroll_down(),
                         _ => {}
@@ -310,6 +311,7 @@ fn ui(f: &mut Frame, app: &App) {
         1 => render_analysis(f, app, chunks[1]),
         2 => render_tools(f, app, chunks[1]),
         3 => render_timeline(f, app, chunks[1]),
+        4 => render_infographics(f, app, chunks[1]),
         _ => {}
     }
 
@@ -317,7 +319,7 @@ fn ui(f: &mut Frame, app: &App) {
 }
 
 fn render_header(f: &mut Frame, app: &App, area: Rect) {
-    let titles = vec!["[1] Overview", "[2] Analysis", "[3] Tools", "[4] Timeline"];
+    let titles = vec!["[1] Overview", "[2] Analysis", "[3] Tools", "[4] Timeline", "[5] Git Infographics"];
 
     let title = if app.current_branch.is_empty() {
         " vibecheck ".to_string()
@@ -806,6 +808,117 @@ fn render_timeline(f: &mut Frame, app: &App, area: Rect) {
             timeline.sessions.len()
         )));
     f.render_widget(timeline_para, chunks[1]);
+}
+
+fn render_infographics(f: &mut Frame, _app: &App, area: Rect) {
+    use std::fs;
+    use std::path::Path;
+
+    let infographics_dir = Path::new("/tmp/git-infographics");
+
+    let mut info_lines = vec![
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("  Git Infographics Generator  ", Style::default().fg(Color::Cyan).bold()),
+        ]),
+        Line::from(""),
+    ];
+
+    if infographics_dir.exists() {
+        info_lines.push(Line::from(vec![
+            Span::styled("  Status: ", Style::default().fg(Color::White)),
+            Span::styled("Generated", Style::default().fg(Color::Green).bold()),
+        ]));
+        info_lines.push(Line::from(""));
+
+        // List generated files
+        info_lines.push(Line::from(vec![
+            Span::styled("  Generated Infographics:", Style::default().fg(Color::Yellow)),
+        ]));
+
+        let infographic_files = vec![
+            ("commit_heatmap.png", "Calendar heatmap of daily commits"),
+            ("top_contributors.png", "Top 15 contributors by commit count"),
+            ("activity_timeline.png", "Commit activity over time (monthly)"),
+            ("hourly_activity.png", "Commits by hour of day"),
+            ("weekday_distribution.png", "Commits by day of week"),
+            ("message_quality.png", "Commit message length distribution"),
+            ("code_contribution.png", "Lines added/deleted by top contributors"),
+        ];
+
+        for (filename, description) in infographic_files {
+            let path = infographics_dir.join(filename);
+            if path.exists() {
+                if let Ok(metadata) = fs::metadata(&path) {
+                    let size_kb = metadata.len() / 1024;
+                    info_lines.push(Line::from(vec![
+                        Span::raw("    "),
+                        Span::styled("✓ ", Style::default().fg(Color::Green).bold()),
+                        Span::styled(filename, Style::default().fg(Color::Cyan)),
+                        Span::raw(format!(" ({} KB)", size_kb)),
+                    ]));
+                    info_lines.push(Line::from(vec![
+                        Span::raw("      "),
+                        Span::styled(description, Style::default().fg(Color::DarkGray)),
+                    ]));
+                }
+            } else {
+                info_lines.push(Line::from(vec![
+                    Span::raw("    "),
+                    Span::styled("✗ ", Style::default().fg(Color::Red)),
+                    Span::styled(filename, Style::default().fg(Color::DarkGray)),
+                ]));
+            }
+        }
+
+        info_lines.push(Line::from(""));
+        info_lines.push(Line::from(vec![
+            Span::styled("  Output Directory: ", Style::default().fg(Color::White)),
+            Span::styled(infographics_dir.display().to_string(), Style::default().fg(Color::Magenta)),
+        ]));
+    } else {
+        info_lines.push(Line::from(vec![
+            Span::styled("  Status: ", Style::default().fg(Color::White)),
+            Span::styled("Not Generated", Style::default().fg(Color::Yellow)),
+        ]));
+        info_lines.push(Line::from(""));
+        info_lines.push(Line::from(vec![
+            Span::raw("  "),
+            Span::styled("No infographics found at ", Style::default().fg(Color::DarkGray)),
+            Span::styled(infographics_dir.display().to_string(), Style::default().fg(Color::Magenta)),
+        ]));
+    }
+
+    info_lines.push(Line::from(""));
+    info_lines.push(Line::from(""));
+    info_lines.push(Line::from(vec![
+        Span::styled("  Commands:", Style::default().fg(Color::Yellow)),
+    ]));
+    info_lines.push(Line::from(vec![
+        Span::raw("    "),
+        Span::styled("vibedev git-infographics", Style::default().fg(Color::Cyan).bold()),
+        Span::raw("  - Analyze current directory"),
+    ]));
+    info_lines.push(Line::from(vec![
+        Span::raw("    "),
+        Span::styled("vibedev git-infographics --scan-all", Style::default().fg(Color::Cyan).bold()),
+        Span::raw("  - Scan all repos in $HOME"),
+    ]));
+    info_lines.push(Line::from(vec![
+        Span::raw("    "),
+        Span::styled("vibedev git-infographics -r /path/to/repo", Style::default().fg(Color::Cyan).bold()),
+        Span::raw("  - Analyze specific repo"),
+    ]));
+    info_lines.push(Line::from(vec![
+        Span::raw("    "),
+        Span::styled("vibedev git-infographics --open", Style::default().fg(Color::Cyan).bold()),
+        Span::raw("  - Open in browser"),
+    ]));
+
+    let para = Paragraph::new(info_lines)
+        .block(Block::default().borders(Borders::ALL).title(" Git Infographics "));
+
+    f.render_widget(para, area);
 }
 
 fn format_bytes(bytes: u64) -> String {

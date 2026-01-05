@@ -41,6 +41,7 @@ mod llm_chat;
 mod report_analyzer;
 mod tui;
 mod ultra_deep;
+mod git_infographics;
 
 use analysis::Analyzer;
 use backup::BackupManager;
@@ -347,6 +348,25 @@ enum Commands {
         /// Skip shell/vim/tmux sessions (focus on AI tools and git)
         #[arg(long)]
         skip_noise: bool,
+    },
+
+    /// Generate beautiful git infographics from commit history
+    GitInfographics {
+        /// Git repositories to analyze (default: scan all in $HOME)
+        #[arg(short, long)]
+        repos: Vec<PathBuf>,
+
+        /// Output directory for infographics (default: ./git-infographics)
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+
+        /// Open infographics in browser after generation
+        #[arg(long)]
+        open: bool,
+
+        /// Scan home directory for all git repos
+        #[arg(long)]
+        scan_all: bool,
     },
 }
 
@@ -1815,6 +1835,87 @@ async fn main() -> Result<()> {
                     println!("   (Could not auto-open image - please open manually)");
                 }
             }
+
+            Ok(())
+        }
+
+        Commands::GitInfographics { repos, output, open, scan_all } => {
+            use colored::Colorize;
+            use git_infographics::GitInfographicsGenerator;
+            use walkdir::WalkDir;
+
+            info!("📊 Generating git infographics...");
+
+            // Determine which repos to analyze
+            let git_repos = if scan_all || repos.is_empty() {
+                println!("{}", "🔍 Scanning for git repositories...".cyan());
+                let home = dirs::home_dir().expect("Could not determine home directory");
+
+                let mut found_repos = Vec::new();
+                for entry in WalkDir::new(home)
+                    .max_depth(4)
+                    .into_iter()
+                    .filter_map(|e| e.ok())
+                {
+                    let path = entry.path();
+                    if path.is_dir() && path.join(".git").exists() {
+                        found_repos.push(path.to_path_buf());
+                    }
+                }
+
+                println!("  Found {} git repositories", found_repos.len().to_string().green());
+                found_repos
+            } else {
+                repos
+            };
+
+            if git_repos.is_empty() {
+                println!("{}", "No git repositories found. Specify repos with -r or use --scan-all".yellow());
+                return Ok(());
+            }
+
+            // Set output directory
+            let output_dir = output.unwrap_or_else(|| PathBuf::from("./git-infographics"));
+            fs::create_dir_all(&output_dir)?;
+
+            // Generate infographics
+            let generator = GitInfographicsGenerator::new(git_repos.clone(), output_dir.clone());
+
+            println!("{}", "\n📈 Collecting git statistics...".cyan());
+            let stats = generator.collect_stats()?;
+
+            if stats.total_commits == 0 {
+                println!("{}", "No commits found in repositories".yellow());
+                return Ok(());
+            }
+
+            println!("  Total Commits: {}", stats.total_commits.to_string().green());
+            println!("  Total Authors: {}", stats.total_authors.to_string().green());
+            println!("  Date Range: {} to {}",
+                stats.date_range.0.to_string().yellow(),
+                stats.date_range.1.to_string().yellow()
+            );
+
+            println!("{}", "\n🎨 Generating infographics...".cyan());
+            let generated = generator.generate_all(&stats)?;
+
+            println!("\n{}", "✅ Infographics generated successfully!".green().bold());
+            println!("\n📁 Output files:");
+            for path in &generated {
+                println!("   • {}", path.display());
+            }
+
+            // Open in browser if requested
+            if open && !generated.is_empty() {
+                println!("\n{}", "🌐 Opening infographics...".cyan());
+                for path in &generated {
+                    if open::that(path).is_err() {
+                        println!("   (Could not auto-open {} - please open manually)", path.display());
+                    }
+                }
+            }
+
+            println!("\n{}", "💡 Tip: Use --scan-all to analyze all repos in your home directory".dimmed());
 
             Ok(())
         }
