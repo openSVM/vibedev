@@ -1,4 +1,4 @@
-// TUI module - Real-time monitoring dashboard (like btop)
+// TUI module - Real-time monitoring dashboard (btop-style)
 use crate::analyzer::ConversationAnalyzer;
 use crate::claude_code_parser::ClaudeCodeParser;
 use crate::discovery::LogDiscovery;
@@ -11,13 +11,13 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
     prelude::CrosstermBackend,
     style::{Color, Modifier, Style, Stylize},
     symbols,
     text::{Line, Span},
     widgets::{
-        Block, Borders, Gauge, Paragraph, Row, Sparkline, Table, Tabs, Wrap,
+        Block, Borders, Gauge, Paragraph, Row, Sparkline, Table, Tabs,
     },
     Frame, Terminal,
 };
@@ -26,10 +26,10 @@ use std::io;
 use std::path::PathBuf;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-const UPDATE_INTERVAL_MS: u64 = 1000; // 1 second updates
-const HISTORY_SIZE: usize = 60; // Keep 60 seconds of history
+const UPDATE_INTERVAL_MS: u64 = 500; // 500ms updates for smoother feel
+const HISTORY_SIZE: usize = 120; // Keep 120 samples (1 minute at 500ms)
 
-/// Real-time metrics tracker
+/// Real-time metrics tracker with extended history
 #[derive(Debug, Clone)]
 pub struct MetricsHistory {
     pub timestamps: VecDeque<u64>,
@@ -77,6 +77,40 @@ impl MetricsHistory {
         self.files.push_back(snapshot.files);
         self.active_sessions.push_back(snapshot.active_sessions);
     }
+
+    fn get_sparkline_data(&self, metric: MetricType, samples: usize) -> Vec<u64> {
+        let data = match metric {
+            MetricType::Storage => &self.storage,
+            MetricType::Conversations => {
+                return self.conversations.iter().map(|&x| x as u64).collect()
+            }
+            MetricType::Messages => return self.messages.iter().map(|&x| x as u64).collect(),
+            MetricType::Tokens => &self.tokens,
+            MetricType::Cost => return self.cost.iter().map(|&x| (x * 100.0) as u64).collect(),
+            MetricType::Files => return self.files.iter().map(|&x| x as u64).collect(),
+            MetricType::ActiveSessions => {
+                return self.active_sessions.iter().map(|&x| x as u64).collect()
+            }
+        };
+
+        let len = data.len();
+        if len <= samples {
+            data.iter().cloned().collect()
+        } else {
+            data.iter().skip(len - samples).cloned().collect()
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+enum MetricType {
+    Storage,
+    Conversations,
+    Messages,
+    Tokens,
+    Cost,
+    Files,
+    ActiveSessions,
 }
 
 #[derive(Debug, Clone)]
@@ -91,7 +125,7 @@ pub struct MetricsSnapshot {
     pub active_sessions: usize,
 }
 
-/// Real-time monitoring app
+/// Real-time monitoring app with enhanced visuals
 pub struct App {
     pub findings: Option<DiscoveryFindings>,
     pub insights: Option<ViralInsights>,
@@ -113,6 +147,9 @@ pub struct App {
     pub hourly_activity: [u64; 24],
     pub start_time: Instant,
     pub uptime: Duration,
+    pub peak_storage: u64,
+    pub peak_tokens: u64,
+    pub peak_active: usize,
 }
 
 impl App {
@@ -121,7 +158,7 @@ impl App {
             findings: None,
             insights: None,
             base_dir,
-            status_message: "Starting real-time monitoring...".to_string(),
+            status_message: "Initializing vibedev monitor...".to_string(),
             tool_sizes: HashMap::new(),
             estimated_tokens: 0,
             estimated_cost: 0.0,
@@ -138,6 +175,9 @@ impl App {
             hourly_activity: [0; 24],
             start_time: Instant::now(),
             uptime: Duration::ZERO,
+            peak_storage: 0,
+            peak_tokens: 0,
+            peak_active: 0,
         }
     }
 
@@ -192,6 +232,11 @@ impl App {
             })
             .count();
 
+        // Track peaks
+        self.peak_storage = self.peak_storage.max(findings.total_size_bytes);
+        self.peak_tokens = self.peak_tokens.max(self.estimated_tokens);
+        self.peak_active = self.peak_active.max(self.active_sessions);
+
         // Save snapshot to history
         let snapshot = MetricsSnapshot {
             timestamp: now,
@@ -214,13 +259,11 @@ impl App {
             self.load_insights();
         }
 
-        self.status_message = format!(
-            "Updates: {} | Active: {} | Storage: {} | Cost: ${:.2}",
-            self.update_count,
-            self.active_sessions,
-            format_bytes(self.findings.as_ref().map(|f| f.total_size_bytes).unwrap_or(0)),
-            self.estimated_cost
-        );
+        self.status_message = if self.active_sessions > 0 {
+            format!("ACTIVE: {} sessions | {}", self.active_sessions, format_uptime(self.uptime))
+        } else {
+            format!("IDLE | {}", format_uptime(self.uptime))
+        };
 
         Ok(())
     }
@@ -270,7 +313,7 @@ impl App {
     }
 }
 
-/// Run the real-time TUI
+/// Run the real-time TUI with btop-style interface
 pub fn run_tui(base_dir: PathBuf) -> Result<()> {
     // Setup terminal
     enable_raw_mode()?;
@@ -306,9 +349,8 @@ fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, app: &mut A
     loop {
         terminal.draw(|f| ui(f, app))?;
 
-        // Update every second
-        let timeout = UPDATE_INTERVAL_MS
-            .saturating_sub(last_tick.elapsed().as_millis() as u64);
+        // Update every 500ms for smoother feel
+        let timeout = UPDATE_INTERVAL_MS.saturating_sub(last_tick.elapsed().as_millis() as u64);
 
         if event::poll(Duration::from_millis(timeout))? {
             if let Event::Key(key) = event::read()? {
@@ -338,240 +380,608 @@ fn ui(f: &mut Frame, app: &App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3),  // Header
-            Constraint::Length(5),  // Gauges
+            Constraint::Length(3),  // Header with tabs
             Constraint::Min(10),    // Main content
-            Constraint::Length(1),  // Footer
+            Constraint::Length(2),  // Status bar
         ])
         .split(f.area());
 
-    // Header
+    // Header with tabs
     render_header(f, app, chunks[0]);
 
-    // Gauges
-    render_gauges(f, app, chunks[1]);
-
-    // Main content
+    // Main content based on selected tab
     match app.selected_tab {
-        0 => render_realtime(f, app, chunks[2]),
-        1 => render_activity(f, app, chunks[2]),
-        2 => render_tools(f, app, chunks[2]),
+        0 => render_dashboard(f, app, chunks[1]),
+        1 => render_metrics(f, app, chunks[1]),
+        2 => render_tools(f, app, chunks[1]),
         _ => {}
     }
 
-    // Footer
-    let footer = if app.paused {
-        " [PAUSED] p:Resume  q:Quit  Tab:Switch  1-3:Jump "
-    } else {
-        " p:Pause  q:Quit  Tab:Switch  1-3:Jump "
-    };
-    let footer_widget = Paragraph::new(footer)
-        .style(Style::default().fg(if app.paused { Color::Yellow } else { Color::DarkGray }));
-    f.render_widget(footer_widget, chunks[3]);
+    // Status bar with rich info
+    render_status_bar(f, app, chunks[2]);
 }
 
 fn render_header(f: &mut Frame, app: &App, area: Rect) {
-    let titles = vec![
-        "[1] Real-Time",
-        "[2] Activity",
-        "[3] Tools",
-    ];
+    let titles = vec!["[1] Dashboard", "[2] Metrics", "[3] Tools"];
+
+    let status_indicator = if app.paused {
+        Span::styled(" ⏸ PAUSED ", Style::default().fg(Color::Black).bg(Color::Yellow).bold())
+    } else if app.active_sessions > 0 {
+        Span::styled(" ● ACTIVE ", Style::default().fg(Color::Black).bg(Color::Green).bold())
+    } else {
+        Span::styled(" ○ IDLE ", Style::default().fg(Color::Black).bg(Color::Blue).bold())
+    };
+
     let tabs = Tabs::new(titles)
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title(format!(
-                    " vibedev Monitor {} | Uptime: {}s ",
-                    if app.paused { "[PAUSED]" } else { "" },
-                    app.uptime.as_secs()
-                ))
-                .title_style(Style::default().fg(Color::Cyan).bold()),
+                .border_style(Style::default().fg(Color::Cyan))
+                .title(vec![
+                    Span::styled("╔═ ", Style::default().fg(Color::Cyan).bold()),
+                    Span::styled("vibedev", Style::default().fg(Color::Magenta).bold()),
+                    Span::styled(" monitor ", Style::default().fg(Color::White)),
+                    status_indicator,
+                    Span::styled(" ═╗", Style::default().fg(Color::Cyan).bold()),
+                ]),
         )
         .select(app.selected_tab)
-        .style(Style::default().fg(Color::Gray))
-        .highlight_style(
-            Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
-        )
-        .divider(symbols::DOT);
+        .style(Style::default().fg(Color::DarkGray))
+        .highlight_style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD | Modifier::UNDERLINED))
+        .divider(symbols::line::VERTICAL);
+
     f.render_widget(tabs, area);
 }
 
-fn render_gauges(f: &mut Frame, app: &App, area: Rect) {
-    let chunks = Layout::default()
+fn render_status_bar(f: &mut Frame, app: &App, area: Rect) {
+    let status_chunks = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Percentage(20),
-            Constraint::Percentage(20),
-            Constraint::Percentage(20),
-            Constraint::Percentage(20),
-            Constraint::Percentage(20),
-        ])
+        .constraints([Constraint::Percentage(70), Constraint::Percentage(30)])
         .split(area);
 
-    // Active sessions gauge
-    let active_pct = ((app.active_sessions as f64 / 10.0) * 100.0).min(100.0) as u16;
-    let active_gauge = Gauge::default()
-        .block(Block::default().borders(Borders::ALL).title(" Active "))
-        .gauge_style(Style::default().fg(if app.active_sessions > 0 { Color::Green } else { Color::DarkGray }))
-        .percent(active_pct)
-        .label(format!("{}", app.active_sessions));
-    f.render_widget(active_gauge, chunks[0]);
+    // Left side - status message
+    let status_text = Paragraph::new(vec![
+        Line::from(vec![
+            Span::styled("│ ", Style::default().fg(Color::DarkGray)),
+            Span::styled(&app.status_message, Style::default().fg(if app.active_sessions > 0 { Color::Green } else { Color::Cyan })),
+        ]),
+    ])
+    .style(Style::default());
 
-    // Conversations gauge
-    let conv_pct = ((app.total_conversations as f64 / 2000.0) * 100.0).min(100.0) as u16;
-    let conv_gauge = Gauge::default()
-        .block(Block::default().borders(Borders::ALL).title(" Convos "))
-        .gauge_style(Style::default().fg(Color::Cyan))
-        .percent(conv_pct)
-        .label(format!("{}", app.total_conversations));
-    f.render_widget(conv_gauge, chunks[1]);
+    f.render_widget(status_text, status_chunks[0]);
 
-    // Messages gauge
-    let msg_pct = ((app.total_messages as f64 / 500000.0) * 100.0).min(100.0) as u16;
-    let msg_gauge = Gauge::default()
-        .block(Block::default().borders(Borders::ALL).title(" Messages "))
-        .gauge_style(Style::default().fg(Color::Blue))
-        .percent(msg_pct)
-        .label(format_large(app.total_messages));
-    f.render_widget(msg_gauge, chunks[2]);
+    // Right side - controls
+    let controls = Paragraph::new(Line::from(vec![
+        Span::styled("TAB", Style::default().fg(Color::Yellow).bold()),
+        Span::styled(":Switch ", Style::default().fg(Color::DarkGray)),
+        Span::styled("SPACE", Style::default().fg(Color::Yellow).bold()),
+        Span::styled(":Pause ", Style::default().fg(Color::DarkGray)),
+        Span::styled("Q", Style::default().fg(Color::Red).bold()),
+        Span::styled(":Quit │", Style::default().fg(Color::DarkGray)),
+    ]))
+    .alignment(Alignment::Right);
 
-    // Tokens gauge
-    let token_pct = ((app.estimated_tokens as f64 / 500_000_000.0) * 100.0).min(100.0) as u16;
-    let token_gauge = Gauge::default()
-        .block(Block::default().borders(Borders::ALL).title(" Tokens "))
-        .gauge_style(Style::default().fg(Color::Yellow))
-        .percent(token_pct)
-        .label(format_tokens(app.estimated_tokens));
-    f.render_widget(token_gauge, chunks[3]);
-
-    // Cost gauge
-    let cost_pct = ((app.estimated_cost / 2000.0) * 100.0).min(100.0) as u16;
-    let cost_gauge = Gauge::default()
-        .block(Block::default().borders(Borders::ALL).title(" Cost "))
-        .gauge_style(Style::default().fg(Color::Magenta))
-        .percent(cost_pct)
-        .label(format!("${:.0}", app.estimated_cost));
-    f.render_widget(cost_gauge, chunks[4]);
+    f.render_widget(controls, status_chunks[1]);
 }
 
-fn render_realtime(f: &mut Frame, app: &App, area: Rect) {
-    let chunks = Layout::default()
+fn render_dashboard(f: &mut Frame, app: &App, area: Rect) {
+    let main_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(8),  // Storage sparkline
-            Constraint::Length(8),  // Conversations sparkline
-            Constraint::Length(8),  // Tokens sparkline
-            Constraint::Min(4),     // Live stats
+            Constraint::Length(9),  // Overview cards
+            Constraint::Min(10),    // Charts and activity
         ])
         .split(area);
 
-    // Storage over time
-    let storage_data: Vec<u64> = app.history.storage.iter().cloned().collect();
-    let max_storage = *storage_data.iter().max().unwrap_or(&1);
+    // Overview cards (4 key metrics)
+    render_overview_cards(f, app, main_chunks[0]);
+
+    // Bottom: Charts side by side
+    let chart_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+        .split(main_chunks[1]);
+
+    render_primary_chart(f, app, chart_chunks[0]);
+    render_activity_panel(f, app, chart_chunks[1]);
+}
+
+fn render_overview_cards(f: &mut Frame, app: &App, area: Rect) {
+    let card_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage(25),
+            Constraint::Percentage(25),
+            Constraint::Percentage(25),
+            Constraint::Percentage(25),
+        ])
+        .split(area);
+
+    // Card 1: Storage
+    let storage_val = app.history.storage.back().cloned().unwrap_or(0);
+    let storage_pct = if app.peak_storage > 0 {
+        ((storage_val as f64 / app.peak_storage as f64) * 100.0) as u16
+    } else {
+        0
+    };
+    let storage_color = metric_color(storage_pct);
+
+    let storage_gauge = Gauge::default()
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(storage_color))
+                .title(vec![
+                    Span::styled("╣ ", Style::default().fg(storage_color)),
+                    Span::styled("Storage", Style::default().fg(Color::White).bold()),
+                    Span::styled(" ╠", Style::default().fg(storage_color)),
+                ]),
+        )
+        .gauge_style(Style::default().fg(storage_color).bg(Color::Black))
+        .percent(storage_pct)
+        .label(format!("{}", format_bytes(storage_val)));
+    f.render_widget(storage_gauge, card_chunks[0]);
+
+    // Card 2: Tokens
+    let tokens_val = app.history.tokens.back().cloned().unwrap_or(0);
+    let tokens_pct = if app.peak_tokens > 0 {
+        ((tokens_val as f64 / app.peak_tokens as f64) * 100.0) as u16
+    } else {
+        0
+    };
+    let tokens_color = metric_color(tokens_pct);
+
+    let tokens_gauge = Gauge::default()
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(tokens_color))
+                .title(vec![
+                    Span::styled("╣ ", Style::default().fg(tokens_color)),
+                    Span::styled("Tokens", Style::default().fg(Color::White).bold()),
+                    Span::styled(" ╠", Style::default().fg(tokens_color)),
+                ]),
+        )
+        .gauge_style(Style::default().fg(tokens_color).bg(Color::Black))
+        .percent(tokens_pct)
+        .label(format!("{}", format_tokens(tokens_val)));
+    f.render_widget(tokens_gauge, card_chunks[1]);
+
+    // Card 3: Cost
+    let cost_val = app.history.cost.back().cloned().unwrap_or(0.0);
+    let cost_pct = ((cost_val / 2000.0) * 100.0).min(100.0) as u16;
+    let cost_color = metric_color(cost_pct);
+
+    let cost_gauge = Gauge::default()
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(cost_color))
+                .title(vec![
+                    Span::styled("╣ ", Style::default().fg(cost_color)),
+                    Span::styled("Cost", Style::default().fg(Color::White).bold()),
+                    Span::styled(" ╠", Style::default().fg(cost_color)),
+                ]),
+        )
+        .gauge_style(Style::default().fg(cost_color).bg(Color::Black))
+        .percent(cost_pct)
+        .label(format!("${:.2}", cost_val));
+    f.render_widget(cost_gauge, card_chunks[2]);
+
+    // Card 4: Active Sessions
+    let active_val = app.history.active_sessions.back().cloned().unwrap_or(0);
+    let active_pct = if app.peak_active > 0 {
+        ((active_val as f64 / app.peak_active as f64) * 100.0) as u16
+    } else if active_val > 0 {
+        100
+    } else {
+        0
+    };
+    let active_color = if active_val > 0 {
+        Color::Green
+    } else {
+        Color::DarkGray
+    };
+
+    let active_gauge = Gauge::default()
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(active_color))
+                .title(vec![
+                    Span::styled("╣ ", Style::default().fg(active_color)),
+                    Span::styled("Active", Style::default().fg(Color::White).bold()),
+                    Span::styled(" ╠", Style::default().fg(active_color)),
+                ]),
+        )
+        .gauge_style(Style::default().fg(active_color).bg(Color::Black))
+        .percent(active_pct)
+        .label(format!("{} sessions", active_val));
+    f.render_widget(active_gauge, card_chunks[3]);
+}
+
+fn render_primary_chart(f: &mut Frame, app: &App, area: Rect) {
+    // Main chart showing storage/tokens/cost trends
+    let chart_area = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(9),
+            Constraint::Length(9),
+            Constraint::Min(5),
+        ])
+        .split(area);
+
+    // Storage sparkline with gradient effect
+    let storage_data = app.history.get_sparkline_data(MetricType::Storage, 60);
+    let storage_max = *storage_data.iter().max().unwrap_or(&1).max(&1);
     let storage_sparkline = Sparkline::default()
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title(format!(
-                    " Storage ({}s) - Current: {} ",
-                    storage_data.len(),
-                    format_bytes(storage_data.last().cloned().unwrap_or(0))
-                )),
+                .border_style(Style::default().fg(Color::Cyan))
+                .title(vec![
+                    Span::styled("▶ ", Style::default().fg(Color::Cyan)),
+                    Span::styled("Storage Flow ", Style::default().fg(Color::White).bold()),
+                    Span::styled(format!("[{}]", format_bytes(storage_data.last().cloned().unwrap_or(0))), Style::default().fg(Color::Cyan)),
+                ]),
         )
         .data(&storage_data)
-        .max(max_storage.max(1))
+        .max(storage_max)
         .style(Style::default().fg(Color::Cyan));
-    f.render_widget(storage_sparkline, chunks[0]);
+    f.render_widget(storage_sparkline, chart_area[0]);
 
-    // Conversations over time
-    let conv_data: Vec<u64> = app.history.conversations.iter().map(|&x| x as u64).collect();
-    let max_conv = *conv_data.iter().max().unwrap_or(&1);
-    let conv_sparkline = Sparkline::default()
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(format!(
-                    " Conversations ({}s) - Current: {} ",
-                    conv_data.len(),
-                    conv_data.last().cloned().unwrap_or(0)
-                )),
-        )
-        .data(&conv_data)
-        .max(max_conv.max(1))
-        .style(Style::default().fg(Color::Green));
-    f.render_widget(conv_sparkline, chunks[1]);
-
-    // Tokens over time
-    let token_data: Vec<u64> = app.history.tokens.iter().cloned().collect();
-    let max_tokens = *token_data.iter().max().unwrap_or(&1);
+    // Tokens sparkline
+    let tokens_data = app.history.get_sparkline_data(MetricType::Tokens, 60);
+    let tokens_max = *tokens_data.iter().max().unwrap_or(&1).max(&1);
     let tokens_sparkline = Sparkline::default()
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title(format!(
-                    " Tokens ({}s) - Current: {} ",
-                    token_data.len(),
-                    format_tokens(token_data.last().cloned().unwrap_or(0))
-                )),
+                .border_style(Style::default().fg(Color::Yellow))
+                .title(vec![
+                    Span::styled("▶ ", Style::default().fg(Color::Yellow)),
+                    Span::styled("Token Flow ", Style::default().fg(Color::White).bold()),
+                    Span::styled(format!("[{}]", format_tokens(tokens_data.last().cloned().unwrap_or(0))), Style::default().fg(Color::Yellow)),
+                ]),
         )
-        .data(&token_data)
-        .max(max_tokens.max(1))
+        .data(&tokens_data)
+        .max(tokens_max)
         .style(Style::default().fg(Color::Yellow));
-    f.render_widget(tokens_sparkline, chunks[2]);
+    f.render_widget(tokens_sparkline, chart_area[1]);
 
-    // Live stats
-    let stats_chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-        .split(chunks[3]);
+    // Stats summary
+    let stats_lines = vec![
+        Line::from(vec![
+            Span::styled("│ ", Style::default().fg(Color::DarkGray)),
+            Span::styled("Conversations: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(format!("{}", app.total_conversations), Style::default().fg(Color::Cyan).bold()),
+        ]),
+        Line::from(vec![
+            Span::styled("│ ", Style::default().fg(Color::DarkGray)),
+            Span::styled("Messages:      ", Style::default().fg(Color::DarkGray)),
+            Span::styled(format_large(app.total_messages), Style::default().fg(Color::Green).bold()),
+        ]),
+        Line::from(vec![
+            Span::styled("│ ", Style::default().fg(Color::DarkGray)),
+            Span::styled("Files:         ", Style::default().fg(Color::DarkGray)),
+            Span::styled(format!("{}", app.total_files), Style::default().fg(Color::Blue).bold()),
+        ]),
+        Line::from(vec![
+            Span::styled("│ ", Style::default().fg(Color::DarkGray)),
+            Span::styled("Tools:         ", Style::default().fg(Color::DarkGray)),
+            Span::styled(format!("{}", app.tool_sizes.len()), Style::default().fg(Color::Magenta).bold()),
+        ]),
+        Line::from(vec![
+            Span::styled("│ ", Style::default().fg(Color::DarkGray)),
+            Span::styled("Updates:       ", Style::default().fg(Color::DarkGray)),
+            Span::styled(format!("{}", app.update_count), Style::default().fg(Color::Yellow)),
+        ]),
+    ];
 
-    // Calculate rates (per second)
-    let storage_rate = if app.history.storage.len() >= 2 {
-        let first = app.history.storage.front().cloned().unwrap_or(0);
-        let last = app.history.storage.back().cloned().unwrap_or(0);
-        let time_diff = app.history.timestamps.len() as f64;
-        ((last as f64 - first as f64) / time_diff) as i64
-    } else {
-        0
-    };
-
-    let conv_rate = if app.history.conversations.len() >= 2 {
-        let first = app.history.conversations.front().cloned().unwrap_or(0);
-        let last = app.history.conversations.back().cloned().unwrap_or(0);
-        let time_diff = app.history.timestamps.len() as f64;
-        ((last as f64 - first as f64) / time_diff * 60.0) as i64 // per minute
-    } else {
-        0
-    };
-
-    let stats_text = format!(
-        "Storage Rate: {}/s\n\
-         Conversation Rate: {}/min\n\
-         Files Tracked: {}\n\
-         Tools Found: {}\n\
-         Active Sessions: {}\n\
-         Updates: {}",
-        format_bytes_signed(storage_rate),
-        conv_rate,
-        app.total_files,
-        app.tool_sizes.len(),
-        app.active_sessions,
-        app.update_count
-    );
-
-    let stats_para = Paragraph::new(stats_text)
+    let stats_para = Paragraph::new(stats_lines)
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title(" Live Stats "),
-        )
-        .wrap(Wrap { trim: true });
-    f.render_widget(stats_para, stats_chunks[0]);
+                .border_style(Style::default().fg(Color::White))
+                .title(vec![
+                    Span::styled("╣ ", Style::default().fg(Color::White)),
+                    Span::styled("Summary", Style::default().fg(Color::White).bold()),
+                    Span::styled(" ╠", Style::default().fg(Color::White)),
+                ]),
+        );
+    f.render_widget(stats_para, chart_area[2]);
+}
 
-    // Recent changes
-    let changes_text = if app.history.storage.len() >= 2 {
+fn render_activity_panel(f: &mut Frame, app: &App, area: Rect) {
+    let activity_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(9), Constraint::Min(10)])
+        .split(area);
+
+    // Active sessions sparkline
+    let active_data = app.history.get_sparkline_data(MetricType::ActiveSessions, 60);
+    let active_max = *active_data.iter().max().unwrap_or(&1).max(&1);
+    let active_color = if active_data.last().cloned().unwrap_or(0) > 0 {
+        Color::Green
+    } else {
+        Color::DarkGray
+    };
+
+    let active_sparkline = Sparkline::default()
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(active_color))
+                .title(vec![
+                    Span::styled("▶ ", Style::default().fg(active_color)),
+                    Span::styled("Active Sessions ", Style::default().fg(Color::White).bold()),
+                    Span::styled(format!("[{}]", active_data.last().cloned().unwrap_or(0)), Style::default().fg(active_color)),
+                ]),
+        )
+        .data(&active_data)
+        .max(active_max)
+        .style(Style::default().fg(active_color));
+    f.render_widget(active_sparkline, activity_chunks[0]);
+
+    // Hourly heatmap with better colors
+    let mut heatmap_lines = vec![
+        Line::from(Span::styled("  Hour of Day Activity", Style::default().fg(Color::White).bold())),
+        Line::from(""),
+    ];
+
+    // Hour labels
+    let hour_labels = Line::from(
+        (0..24)
+            .map(|h| {
+                Span::styled(
+                    format!("{:02} ", h),
+                    Style::default().fg(Color::DarkGray),
+                )
+            })
+            .collect::<Vec<_>>(),
+    );
+    heatmap_lines.push(hour_labels);
+
+    // Activity bars
+    let max_hourly = *app.hourly_activity.iter().max().unwrap_or(&1).max(&1);
+    let bar_spans: Vec<Span> = app
+        .hourly_activity
+        .iter()
+        .map(|&count| {
+            let intensity = if max_hourly > 0 {
+                (count as f64 / max_hourly as f64 * 8.0) as usize
+            } else {
+                0
+            };
+
+            let (block, color) = match intensity {
+                0 => ("░░ ", Color::DarkGray),
+                1 => ("▁▁ ", Color::Blue),
+                2 => ("▂▂ ", Color::Blue),
+                3 => ("▃▃ ", Color::Cyan),
+                4 => ("▄▄ ", Color::Cyan),
+                5 => ("▅▅ ", Color::Green),
+                6 => ("▆▆ ", Color::Green),
+                7 => ("▇▇ ", Color::Yellow),
+                _ => ("██ ", Color::Red),
+            };
+
+            Span::styled(block, Style::default().fg(color).bold())
+        })
+        .collect();
+
+    heatmap_lines.push(Line::from(bar_spans));
+
+    // Peak info
+    let peak_hour = app
+        .hourly_activity
+        .iter()
+        .enumerate()
+        .max_by_key(|(_, &v)| v)
+        .map(|(h, _)| h)
+        .unwrap_or(0);
+
+    heatmap_lines.push(Line::from(""));
+    heatmap_lines.push(Line::from(vec![
+        Span::styled("  Peak Activity: ", Style::default().fg(Color::DarkGray)),
+        Span::styled(
+            format!("{:02}:00-{:02}:00", peak_hour, (peak_hour + 1) % 24),
+            Style::default().fg(Color::Green).bold(),
+        ),
+    ]));
+
+    let heatmap = Paragraph::new(heatmap_lines)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Magenta))
+                .title(vec![
+                    Span::styled("╣ ", Style::default().fg(Color::Magenta)),
+                    Span::styled("Activity Heatmap", Style::default().fg(Color::White).bold()),
+                    Span::styled(" ╠", Style::default().fg(Color::Magenta)),
+                ]),
+        );
+    f.render_widget(heatmap, activity_chunks[1]);
+}
+
+fn render_metrics(f: &mut Frame, app: &App, area: Rect) {
+    let metrics_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+        .split(area);
+
+    // Left: Detailed metrics
+    render_detailed_metrics(f, app, metrics_chunks[0]);
+
+    // Right: Trends and rates
+    render_trends(f, app, metrics_chunks[1]);
+}
+
+fn render_detailed_metrics(f: &mut Frame, app: &App, area: Rect) {
+    let metric_lines = vec![
+        Line::from(vec![
+            Span::styled("╔═══ ", Style::default().fg(Color::Cyan)),
+            Span::styled("Current Values", Style::default().fg(Color::White).bold()),
+            Span::styled(" ═══╗", Style::default().fg(Color::Cyan)),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("  Storage:       ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format_bytes(app.history.storage.back().cloned().unwrap_or(0)),
+                Style::default().fg(Color::Cyan).bold(),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled("  Tokens:        ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format_tokens(app.history.tokens.back().cloned().unwrap_or(0)),
+                Style::default().fg(Color::Yellow).bold(),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled("  Cost:          ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("${:.2}", app.history.cost.back().cloned().unwrap_or(0.0)),
+                Style::default().fg(Color::Magenta).bold(),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled("  Conversations: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("{}", app.history.conversations.back().cloned().unwrap_or(0)),
+                Style::default().fg(Color::Green).bold(),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled("  Messages:      ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format_large(app.history.messages.back().cloned().unwrap_or(0)),
+                Style::default().fg(Color::Blue).bold(),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled("  Files:         ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("{}", app.history.files.back().cloned().unwrap_or(0)),
+                Style::default().fg(Color::Cyan).bold(),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled("  Active:        ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("{}", app.history.active_sessions.back().cloned().unwrap_or(0)),
+                Style::default().fg(Color::Green).bold(),
+            ),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("╔═══ ", Style::default().fg(Color::Yellow)),
+            Span::styled("Peak Values", Style::default().fg(Color::White).bold()),
+            Span::styled(" ═══╗", Style::default().fg(Color::Yellow)),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("  Storage:       ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format_bytes(app.peak_storage),
+                Style::default().fg(Color::Cyan).bold(),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled("  Tokens:        ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format_tokens(app.peak_tokens),
+                Style::default().fg(Color::Yellow).bold(),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled("  Active:        ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("{}", app.peak_active),
+                Style::default().fg(Color::Green).bold(),
+            ),
+        ]),
+    ];
+
+    let metrics_para = Paragraph::new(metric_lines)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::White))
+                .title(" Metrics "),
+        );
+    f.render_widget(metrics_para, area);
+}
+
+fn render_trends(f: &mut Frame, app: &App, area: Rect) {
+    let trends_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+        .split(area);
+
+    // Calculate rates
+    let (storage_rate, conv_rate, msg_rate) = if app.history.storage.len() >= 2 {
+        let time_diff = app.history.timestamps.len() as f64;
+
+        let storage_first = app.history.storage.front().cloned().unwrap_or(0);
+        let storage_last = app.history.storage.back().cloned().unwrap_or(0);
+        let storage_rate = ((storage_last as f64 - storage_first as f64) / time_diff) as i64;
+
+        let conv_first = app.history.conversations.front().cloned().unwrap_or(0);
+        let conv_last = app.history.conversations.back().cloned().unwrap_or(0);
+        let conv_rate = ((conv_last as f64 - conv_first as f64) / time_diff * 60.0) as i64;
+
+        let msg_first = app.history.messages.front().cloned().unwrap_or(0);
+        let msg_last = app.history.messages.back().cloned().unwrap_or(0);
+        let msg_rate = ((msg_last as f64 - msg_first as f64) / time_diff * 60.0) as i64;
+
+        (storage_rate, conv_rate, msg_rate)
+    } else {
+        (0, 0, 0)
+    };
+
+    let rate_lines = vec![
+        Line::from(vec![
+            Span::styled("╔═══ ", Style::default().fg(Color::Green)),
+            Span::styled("Rates", Style::default().fg(Color::White).bold()),
+            Span::styled(" ═══╗", Style::default().fg(Color::Green)),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("  Storage:    ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("{}/s", format_bytes_signed(storage_rate)),
+                Style::default().fg(if storage_rate > 0 { Color::Green } else if storage_rate < 0 { Color::Red } else { Color::DarkGray }).bold(),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled("  Convos:     ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("{:+}/min", conv_rate),
+                Style::default().fg(if conv_rate > 0 { Color::Green } else if conv_rate < 0 { Color::Red } else { Color::DarkGray }).bold(),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled("  Messages:   ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("{:+}/min", msg_rate),
+                Style::default().fg(if msg_rate > 0 { Color::Green } else if msg_rate < 0 { Color::Red } else { Color::DarkGray }).bold(),
+            ),
+        ]),
+    ];
+
+    let rates_para = Paragraph::new(rate_lines)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Green))
+                .title(" Live Rates "),
+        );
+    f.render_widget(rates_para, trends_chunks[0]);
+
+    // Deltas over history window
+    let deltas = if app.history.storage.len() >= 2 {
         let storage_delta = app.history.storage.back().cloned().unwrap_or(0) as i64
             - app.history.storage.front().cloned().unwrap_or(0) as i64;
         let conv_delta = app.history.conversations.back().cloned().unwrap_or(0) as i64
@@ -581,130 +991,66 @@ fn render_realtime(f: &mut Frame, app: &App, area: Rect) {
         let cost_delta = app.history.cost.back().cloned().unwrap_or(0.0)
             - app.history.cost.front().cloned().unwrap_or(0.0);
 
-        format!(
-            "Storage: {}\n\
-             Conversations: {:+}\n\
-             Messages: {:+}\n\
-             Cost: ${:+.2}\n\n\
-             Since: {}s ago",
-            format_bytes_signed(storage_delta),
-            conv_delta,
-            msg_delta,
-            cost_delta,
-            app.history.timestamps.len()
-        )
+        vec![
+            Line::from(vec![
+                Span::styled("╔═══ ", Style::default().fg(Color::Magenta)),
+                Span::styled(format!("Changes ({}s)", app.history.timestamps.len()), Style::default().fg(Color::White).bold()),
+                Span::styled(" ═══╗", Style::default().fg(Color::Magenta)),
+            ]),
+            Line::from(""),
+            Line::from(vec![
+                Span::styled("  Storage:    ", Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    format_bytes_signed(storage_delta),
+                    Style::default().fg(if storage_delta > 0 { Color::Green } else if storage_delta < 0 { Color::Red } else { Color::DarkGray }).bold(),
+                ),
+            ]),
+            Line::from(vec![
+                Span::styled("  Convos:     ", Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    format!("{:+}", conv_delta),
+                    Style::default().fg(if conv_delta > 0 { Color::Green } else if conv_delta < 0 { Color::Red } else { Color::DarkGray }).bold(),
+                ),
+            ]),
+            Line::from(vec![
+                Span::styled("  Messages:   ", Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    format!("{:+}", msg_delta),
+                    Style::default().fg(if msg_delta > 0 { Color::Green } else if msg_delta < 0 { Color::Red } else { Color::DarkGray }).bold(),
+                ),
+            ]),
+            Line::from(vec![
+                Span::styled("  Cost:       ", Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    format!("${:+.2}", cost_delta),
+                    Style::default().fg(if cost_delta > 0.01 { Color::Red } else if cost_delta < -0.01 { Color::Green } else { Color::DarkGray }).bold(),
+                ),
+            ]),
+        ]
     } else {
-        "Collecting data...".to_string()
+        vec![Line::from(Span::styled("  Collecting data...", Style::default().fg(Color::DarkGray)))]
     };
 
-    let changes_para = Paragraph::new(changes_text)
+    let deltas_para = Paragraph::new(deltas)
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title(" Changes (Last 60s) "),
-        )
-        .wrap(Wrap { trim: true });
-    f.render_widget(changes_para, stats_chunks[1]);
-}
-
-fn render_activity(f: &mut Frame, app: &App, area: Rect) {
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(8),  // Active sessions sparkline
-            Constraint::Min(8),     // Hourly heatmap
-        ])
-        .split(area);
-
-    // Active sessions over time
-    let active_data: Vec<u64> = app.history.active_sessions.iter().map(|&x| x as u64).collect();
-    let max_active = *active_data.iter().max().unwrap_or(&1).max(&1);
-    let active_sparkline = Sparkline::default()
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(format!(
-                    " Active Sessions ({}s) - Current: {} ",
-                    active_data.len(),
-                    active_data.last().cloned().unwrap_or(0)
-                )),
-        )
-        .data(&active_data)
-        .max(max_active)
-        .style(Style::default().fg(Color::Green));
-    f.render_widget(active_sparkline, chunks[0]);
-
-    // Hourly activity heatmap
-    let mut hourly_lines: Vec<Line> = vec![Line::from(Span::styled(
-        "  00  01  02  03  04  05  06  07  08  09  10  11  12  13  14  15  16  17  18  19  20  21  22  23",
-        Style::default().fg(Color::DarkGray),
-    ))];
-
-    let max_hourly = *app.hourly_activity.iter().max().unwrap_or(&1).max(&1);
-    let mut hour_spans: Vec<Span> = vec![];
-
-    for (i, &count) in app.hourly_activity.iter().enumerate() {
-        let intensity = if max_hourly > 0 {
-            (count as f64 / max_hourly as f64 * 4.0) as usize
-        } else {
-            0
-        };
-
-        let block = match intensity {
-            0 => "  . ",
-            1 => " ░░ ",
-            2 => " ▒▒ ",
-            3 => " ▓▓ ",
-            _ => " ██ ",
-        };
-
-        let color = match intensity {
-            0 => Color::DarkGray,
-            1 => Color::Blue,
-            2 => Color::Cyan,
-            3 => Color::Green,
-            _ => Color::Yellow,
-        };
-
-        hour_spans.push(Span::styled(block, Style::default().fg(color)));
-
-        if (i + 1) % 24 == 0 {
-            hourly_lines.push(Line::from(hour_spans.clone()));
-            hour_spans.clear();
-        }
-    }
-
-    let peak_hour = app
-        .hourly_activity
-        .iter()
-        .enumerate()
-        .max_by_key(|(_, &v)| v)
-        .map(|(h, _)| h)
-        .unwrap_or(0);
-
-    hourly_lines.push(Line::from(""));
-    hourly_lines.push(Line::from(vec![
-        Span::raw("Peak: "),
-        Span::styled(
-            format!("{:02}:00 - {:02}:00", peak_hour, (peak_hour + 1) % 24),
-            Style::default().fg(Color::Green).bold(),
-        ),
-    ]));
-
-    let heatmap = Paragraph::new(hourly_lines)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(" 24-Hour Activity Heatmap "),
-        )
-        .wrap(Wrap { trim: false });
-    f.render_widget(heatmap, chunks[1]);
+                .border_style(Style::default().fg(Color::Magenta))
+                .title(" Delta Tracker "),
+        );
+    f.render_widget(deltas_para, trends_chunks[1]);
 }
 
 fn render_tools(f: &mut Frame, app: &App, area: Rect) {
     let Some(ref findings) = app.findings else {
-        let placeholder = Paragraph::new("Scanning...")
-            .block(Block::default().borders(Borders::ALL).title(" Tools "));
+        let placeholder = Paragraph::new("  Scanning for AI tools...")
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(Color::Cyan))
+                    .title(" Tools Discovery "),
+            )
+            .style(Style::default().fg(Color::DarkGray));
         f.render_widget(placeholder, area);
         return;
     };
@@ -714,45 +1060,77 @@ fn render_tools(f: &mut Frame, app: &App, area: Rect) {
 
     let rows: Vec<Row> = tool_data
         .iter()
-        .map(|(name, size)| {
+        .enumerate()
+        .map(|(idx, (name, size))| {
             let pct = (**size as f64 / findings.total_size_bytes as f64) * 100.0;
-            let bar_width = ((pct / 100.0) * 30.0) as usize;
-            let bar = "█".repeat(bar_width) + &"░".repeat(30 - bar_width);
+            let bar_width = ((pct / 100.0) * 40.0) as usize;
+            let bar = "█".repeat(bar_width);
+            let empty = "░".repeat(40 - bar_width);
+
+            let row_color = match idx {
+                0 => Color::Cyan,
+                1 => Color::Green,
+                2 => Color::Yellow,
+                _ => Color::White,
+            };
 
             Row::new(vec![
-                Span::styled(name.to_string(), Style::default().fg(Color::Cyan)),
+                Span::styled(format!("{:2}", idx + 1), Style::default().fg(Color::DarkGray)),
+                Span::styled(name.to_string(), Style::default().fg(row_color).bold()),
                 Span::styled(format_bytes(**size), Style::default().fg(Color::Yellow)),
                 Span::raw(format!("{:>5.1}%", pct)),
-                Span::styled(bar, Style::default().fg(Color::Green)),
+                Span::styled(bar, Style::default().fg(Color::Green).bold()),
+                Span::styled(empty, Style::default().fg(Color::DarkGray)),
             ])
         })
         .collect();
 
-    let header = Row::new(vec!["Tool", "Size", "%", "Distribution"])
-        .style(
-            Style::default()
-                .add_modifier(Modifier::BOLD)
-                .fg(Color::White),
-        )
+    let header = Row::new(vec!["#", "Tool", "Size", "%", "Distribution", ""])
+        .style(Style::default().add_modifier(Modifier::BOLD).fg(Color::Cyan))
         .bottom_margin(1);
 
     let table = Table::new(
         rows,
         [
-            Constraint::Length(20),
+            Constraint::Length(3),
+            Constraint::Length(18),
             Constraint::Length(12),
-            Constraint::Length(8),
-            Constraint::Min(32),
+            Constraint::Length(7),
+            Constraint::Min(40),
+            Constraint::Min(0),
         ],
     )
     .header(header)
     .block(
         Block::default()
             .borders(Borders::ALL)
-            .title(format!(" Tools ({}) ", tool_data.len())),
+            .border_style(Style::default().fg(Color::Cyan))
+            .title(format!("╣ Tools Discovery ({}) ╠", tool_data.len()))
+            .title_style(Style::default().fg(Color::Cyan)),
     );
 
     f.render_widget(table, area);
+}
+
+// Helper functions for color-coded metrics
+fn metric_color(percent: u16) -> Color {
+    match percent {
+        0..=30 => Color::Green,
+        31..=60 => Color::Yellow,
+        61..=80 => Color::LightRed,
+        _ => Color::Red,
+    }
+}
+
+fn format_uptime(duration: Duration) -> String {
+    let secs = duration.as_secs();
+    if secs < 60 {
+        format!("{}s", secs)
+    } else if secs < 3600 {
+        format!("{}m {}s", secs / 60, secs % 60)
+    } else {
+        format!("{}h {}m", secs / 3600, (secs % 3600) / 60)
+    }
 }
 
 fn format_bytes(bytes: u64) -> String {
@@ -761,20 +1139,24 @@ fn format_bytes(bytes: u64) -> String {
     const GB: u64 = MB * 1024;
 
     if bytes >= GB {
-        format!("{:.2} GB", bytes as f64 / GB as f64)
+        format!("{:.2}GB", bytes as f64 / GB as f64)
     } else if bytes >= MB {
-        format!("{:.2} MB", bytes as f64 / MB as f64)
+        format!("{:.1}MB", bytes as f64 / MB as f64)
     } else if bytes >= KB {
-        format!("{:.2} KB", bytes as f64 / KB as f64)
+        format!("{:.1}KB", bytes as f64 / KB as f64)
     } else {
-        format!("{} B", bytes)
+        format!("{}B", bytes)
     }
 }
 
 fn format_bytes_signed(bytes: i64) -> String {
     let abs_bytes = bytes.abs() as u64;
-    let sign = if bytes >= 0 { "+" } else { "-" };
-    format!("{}{}", sign, format_bytes(abs_bytes))
+    let formatted = format_bytes(abs_bytes);
+    if bytes >= 0 {
+        format!("+{}", formatted)
+    } else {
+        format!("-{}", formatted)
+    }
 }
 
 fn format_tokens(tokens: u64) -> String {
@@ -796,14 +1178,6 @@ fn format_large(num: usize) -> String {
         format!("{:.1}K", num as f64 / 1_000.0)
     } else {
         format!("{}", num)
-    }
-}
-
-fn truncate(s: &str, max_len: usize) -> String {
-    if s.len() <= max_len {
-        s.to_string()
-    } else {
-        format!("{}...", &s[..max_len - 3])
     }
 }
 
@@ -952,20 +1326,27 @@ pub fn print_cli_output(base_dir: PathBuf) -> Result<()> {
 
     for loc in locations.iter().take(10) {
         let pct = (loc.size_bytes as f64 / findings.total_size_bytes as f64) * 100.0;
+        let path_str = loc.path.to_string_lossy();
+        let truncated = if path_str.len() > 50 {
+            format!("...{}", &path_str[path_str.len() - 47..])
+        } else {
+            path_str.to_string()
+        };
+
         println!(
             "  {:>10} {:>5.1}%  {} {} {}",
             ColoredColorize::yellow(format_bytes(loc.size_bytes).as_str()),
             pct,
             ColoredColorize::cyan(loc.tool.name()),
             ColoredColorize::bright_black(format!("{:?}", loc.log_type).as_str()),
-            ColoredColorize::bright_black(truncate(&loc.path.to_string_lossy(), 40).as_str())
+            ColoredColorize::bright_black(truncated.as_str())
         );
     }
 
     println!();
     println!(
         "{}",
-        ColoredColorize::bright_black("Run 'vibedev tui' for real-time monitoring dashboard")
+        ColoredColorize::bright_black("Run 'vibedev tui' for real-time btop-style monitoring")
     );
 
     Ok(())
