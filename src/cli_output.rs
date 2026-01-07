@@ -182,7 +182,13 @@ impl OutputWriter {
 
         match self.mode {
             OutputMode::Human => {
-                print!("\r  {} [{}/{}] {:.0}%", "⏳".cyan(), current, total, percentage);
+                print!(
+                    "\r  {} [{}/{}] {:.0}%",
+                    "⏳".cyan(),
+                    current,
+                    total,
+                    percentage
+                );
                 if current == total {
                     println!();
                 }
@@ -257,7 +263,11 @@ impl OutputWriter {
         let filled = ((value / max * width as f64) as usize).min(width);
         let bar = match self.mode {
             OutputMode::Human => {
-                format!("{}{}", "█".repeat(filled).cyan(), "░".repeat(width - filled))
+                format!(
+                    "{}{}",
+                    "█".repeat(filled).cyan(),
+                    "░".repeat(width - filled)
+                )
             }
             OutputMode::Plain => {
                 format!("{}{}", "#".repeat(filled), "-".repeat(width - filled))

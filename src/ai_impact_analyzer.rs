@@ -1,6 +1,6 @@
 // AI Impact Analyzer - Correlate AI usage with git commits to measure real productivity impact
 use anyhow::Result;
-use chrono::{DateTime, Datelike, Duration, Timelike, Utc};
+use chrono::{DateTime, Duration, Timelike, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -23,11 +23,11 @@ pub struct AIPairProgrammingSession {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum PairProgrammingType {
-    IntenseCollaboration,  // Many commits during conversation
-    ClaudeGuidedRefactor,  // Large changes with AI guidance
-    QuickFix,              // Single commit after short conversation
-    LearningSession,       // Conversation but no commits (learning)
-    CopyPasteFromClaude,   // Suspiciously fast commit after AI response
+    IntenseCollaboration, // Many commits during conversation
+    ClaudeGuidedRefactor, // Large changes with AI guidance
+    QuickFix,             // Single commit after short conversation
+    LearningSession,      // Conversation but no commits (learning)
+    CopyPasteFromClaude,  // Suspiciously fast commit after AI response
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -61,9 +61,9 @@ pub struct AIImpactReport {
     pub ai_assistance_rate: f64,
 
     // Productivity metrics
-    pub avg_commit_velocity_with_ai: f64,    // commits per hour
+    pub avg_commit_velocity_with_ai: f64, // commits per hour
     pub avg_commit_velocity_without_ai: f64,
-    pub velocity_improvement: f64,            // percentage
+    pub velocity_improvement: f64, // percentage
 
     // Code volume metrics
     pub lines_written_with_ai: usize,
@@ -110,8 +110,8 @@ impl AIImpactAnalyzer {
     }
 
     pub fn load_claude_conversations(&mut self, claude_dir: &PathBuf) -> Result<()> {
-        use std::fs;
         use serde_json::Value;
+        use std::fs;
 
         let projects_dir = claude_dir.join("projects");
         if !projects_dir.exists() {
@@ -134,7 +134,8 @@ impl AIImpactAnalyzer {
                 for line in content.lines() {
                     if let Ok(value) = serde_json::from_str::<Value>(line) {
                         // Extract timestamp
-                        if let Some(ts) = value.get("ts")
+                        if let Some(ts) = value
+                            .get("ts")
                             .or_else(|| value.get("timestamp"))
                             .and_then(|v| v.as_str())
                         {
@@ -148,14 +149,19 @@ impl AIImpactAnalyzer {
                         }
 
                         // Count messages and tool uses
-                        if value.get("userMessage").is_some() || value.get("assistantMessage").is_some() {
+                        if value.get("userMessage").is_some()
+                            || value.get("assistantMessage").is_some()
+                        {
                             message_count += 1;
                         }
                         if value.get("tool_use").is_some() || value.get("toolUse").is_some() {
                             tool_use_count += 1;
                         }
                         if let Some(tool) = value.get("tool").and_then(|t| t.as_str()) {
-                            if tool.contains("edit") || tool.contains("write") || tool.contains("read") {
+                            if tool.contains("edit")
+                                || tool.contains("write")
+                                || tool.contains("read")
+                            {
                                 file_op_count += 1;
                             }
                         }
@@ -222,7 +228,8 @@ impl AIImpactAnalyzer {
                             current_commit = Some(GitCommitInfo {
                                 hash: parts[1].to_string(),
                                 author: parts[2].to_string(),
-                                timestamp: DateTime::from_timestamp(timestamp, 0).unwrap_or(Utc::now()),
+                                timestamp: DateTime::from_timestamp(timestamp, 0)
+                                    .unwrap_or(Utc::now()),
                                 message: parts[4].to_string(),
                                 files_changed: 0,
                                 insertions: 0,
@@ -263,7 +270,8 @@ impl AIImpactAnalyzer {
                                     "kt" => "Kotlin",
                                     _ => "Other",
                                 };
-                                *language_breakdown.entry(lang.to_string()).or_insert(0) += ins + del;
+                                *language_breakdown.entry(lang.to_string()).or_insert(0) +=
+                                    ins + del;
                             }
                         }
                     }
@@ -299,7 +307,8 @@ impl AIImpactAnalyzer {
             for commit in &self.git_commits {
                 // Check if commit happened during or shortly after conversation
                 if commit.timestamp >= conversation.start
-                    && commit.timestamp <= conversation.end + self.correlation_window {
+                    && commit.timestamp <= conversation.end + self.correlation_window
+                {
                     session_commits.push(commit.clone());
                 }
             }
@@ -356,10 +365,13 @@ impl AIImpactAnalyzer {
         let (ai_velocity, solo_velocity) = self.calculate_velocities(&pair_sessions);
 
         // Calculate code volume
-        let ai_lines: usize = pair_sessions.iter()
+        let ai_lines: usize = pair_sessions
+            .iter()
             .map(|s| s.lines_added + s.lines_deleted)
             .sum();
-        let solo_lines: usize = self.git_commits.iter()
+        let solo_lines: usize = self
+            .git_commits
+            .iter()
             .filter(|c| !self.is_commit_ai_assisted(c, &pair_sessions))
             .map(|c| c.insertions + c.deletions)
             .sum();
@@ -380,7 +392,9 @@ impl AIImpactAnalyzer {
             total_sessions: pair_sessions.len(),
             ai_assisted_commits,
             solo_commits,
-            ai_assistance_rate: ai_assisted_commits as f64 / (ai_assisted_commits + solo_commits) as f64 * 100.0,
+            ai_assistance_rate: ai_assisted_commits as f64
+                / (ai_assisted_commits + solo_commits) as f64
+                * 100.0,
 
             avg_commit_velocity_with_ai: ai_velocity,
             avg_commit_velocity_without_ai: solo_velocity,
@@ -392,7 +406,8 @@ impl AIImpactAnalyzer {
 
             avg_files_per_commit_with_ai: ai_files_avg,
             avg_files_per_commit_solo: solo_files_avg,
-            refactor_sessions: pair_sessions.iter()
+            refactor_sessions: pair_sessions
+                .iter()
                 .filter(|s| matches!(s.session_type, PairProgrammingType::ClaudeGuidedRefactor))
                 .count(),
 
@@ -439,10 +454,14 @@ impl AIImpactAnalyzer {
         PairProgrammingType::IntenseCollaboration
     }
 
-    fn is_commit_ai_assisted(&self, commit: &GitCommitInfo, sessions: &[AIPairProgrammingSession]) -> bool {
-        sessions.iter().any(|s| {
-            s.git_commits.iter().any(|c| c.hash == commit.hash)
-        })
+    fn is_commit_ai_assisted(
+        &self,
+        commit: &GitCommitInfo,
+        sessions: &[AIPairProgrammingSession],
+    ) -> bool {
+        sessions
+            .iter()
+            .any(|s| s.git_commits.iter().any(|c| c.hash == commit.hash))
     }
 
     fn calculate_velocities(&self, sessions: &[AIPairProgrammingSession]) -> (f64, f64) {
@@ -450,13 +469,17 @@ impl AIImpactAnalyzer {
             return (0.0, 0.0);
         }
 
-        let total_ai_hours: f64 = sessions.iter()
+        let total_ai_hours: f64 = sessions
+            .iter()
             .map(|s| s.end.signed_duration_since(s.start).num_minutes() as f64 / 60.0)
             .sum();
-        let ai_velocity = sessions.iter().map(|s| s.git_commits.len()).sum::<usize>() as f64 / total_ai_hours.max(0.1);
+        let ai_velocity = sessions.iter().map(|s| s.git_commits.len()).sum::<usize>() as f64
+            / total_ai_hours.max(0.1);
 
         // Estimate solo velocity from commits not in any session
-        let solo_commits: Vec<_> = self.git_commits.iter()
+        let solo_commits: Vec<_> = self
+            .git_commits
+            .iter()
             .filter(|c| !self.is_commit_ai_assisted(c, sessions))
             .collect();
 
@@ -482,7 +505,8 @@ impl AIImpactAnalyzer {
             }
         }
 
-        language_commits.into_iter()
+        language_commits
+            .into_iter()
             .max_by_key(|(_, count)| *count)
             .map(|(lang, _)| lang)
             .unwrap_or_else(|| "Unknown".to_string())
@@ -496,13 +520,17 @@ impl AIImpactAnalyzer {
             *hour_productivity.entry(hour).or_insert(0) += session.git_commits.len();
         }
 
-        hour_productivity.into_iter()
+        hour_productivity
+            .into_iter()
             .max_by_key(|(_, commits)| *commits)
             .map(|(hour, _)| hour)
             .unwrap_or(0)
     }
 
-    fn calculate_learning_curve(&self, sessions: &[AIPairProgrammingSession]) -> Vec<MonthlyAIDependency> {
+    fn calculate_learning_curve(
+        &self,
+        sessions: &[AIPairProgrammingSession],
+    ) -> Vec<MonthlyAIDependency> {
         use std::collections::BTreeMap;
 
         let mut monthly_data: BTreeMap<String, (usize, usize)> = BTreeMap::new();
@@ -522,7 +550,8 @@ impl AIImpactAnalyzer {
             }
         }
 
-        monthly_data.into_iter()
+        monthly_data
+            .into_iter()
             .map(|(month, (ai, solo))| MonthlyAIDependency {
                 month,
                 ai_assisted_commits: ai,
@@ -533,20 +562,21 @@ impl AIImpactAnalyzer {
     }
 
     fn calculate_avg_files_per_commit(&self, sessions: &[AIPairProgrammingSession]) -> (f64, f64) {
-        let ai_files: usize = sessions.iter()
+        let ai_files: usize = sessions
+            .iter()
             .flat_map(|s| &s.git_commits)
             .map(|c| c.files_changed)
             .sum();
-        let ai_commits: usize = sessions.iter()
-            .map(|s| s.git_commits.len())
-            .sum();
+        let ai_commits: usize = sessions.iter().map(|s| s.git_commits.len()).sum();
         let ai_avg = if ai_commits > 0 {
             ai_files as f64 / ai_commits as f64
         } else {
             0.0
         };
 
-        let solo_commits: Vec<_> = self.git_commits.iter()
+        let solo_commits: Vec<_> = self
+            .git_commits
+            .iter()
             .filter(|c| !self.is_commit_ai_assisted(c, sessions))
             .collect();
         let solo_files: usize = solo_commits.iter().map(|c| c.files_changed).sum();

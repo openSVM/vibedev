@@ -8,41 +8,41 @@ use tracing_subscriber::FmtSubscriber;
 mod advanced_analytics;
 mod ai_impact_analyzer;
 mod analysis;
-mod cli_output;
-mod history_sanitizer;
 mod analyzer;
 mod backup;
 mod claude_code_parser;
+mod cli_output;
 mod comprehensive_analyzer;
 mod comprehensive_backup_analytics;
-mod shell_analytics;
-mod workflow_correlation;
 mod discovery;
+mod history_sanitizer;
 mod metrics;
 mod models;
 mod parsers;
 mod prepare;
 mod report;
 mod sanitizer;
+mod shell_analytics;
 mod viral_insights;
 mod work_hours_analyzer;
+mod workflow_correlation;
 // mod infographics;  // Temporarily disabled due to compilation errors
 mod cache;
 mod claude_config;
 mod daemon;
-mod timeline;
-mod timeline_png;
 mod dataset_extractor;
 mod deep_insights;
 mod embedded_llm;
 mod extraction_utils;
 mod extractors;
+mod git_infographics;
 mod html_report;
 mod llm_chat;
 mod report_analyzer;
+mod timeline;
+mod timeline_png;
 mod tui;
 mod ultra_deep;
-mod git_infographics;
 
 use analysis::Analyzer;
 use backup::BackupManager;
@@ -589,13 +589,22 @@ async fn main() -> Result<()> {
 
                 if claude_dir.exists() {
                     let claude_archive = if timestamp {
-                        output_dir.join(format!("claude-logs-{}.tar.gz", chrono::Utc::now().format("%Y%m%d-%H%M%S")))
+                        output_dir.join(format!(
+                            "claude-logs-{}.tar.gz",
+                            chrono::Utc::now().format("%Y%m%d-%H%M%S")
+                        ))
                     } else {
                         output_dir.join("claude-logs.tar.gz")
                     };
 
                     std::process::Command::new("tar")
-                        .args(&["-czf", claude_archive.to_str().unwrap(), "-C", home.to_str().unwrap(), ".claude"])
+                        .args(&[
+                            "-czf",
+                            claude_archive.to_str().unwrap(),
+                            "-C",
+                            home.to_str().unwrap(),
+                            ".claude",
+                        ])
                         .status()?;
 
                     let size = std::fs::metadata(&claude_archive)?.len() as f64 / 1024.0 / 1024.0;
@@ -618,13 +627,18 @@ async fn main() -> Result<()> {
             if include_git {
                 println!();
                 println!("{}", "📝 Exporting git commit history...".cyan());
-                println!("  {} Found {} git repositories", "✓".green(), git_repos.len());
+                println!(
+                    "  {} Found {} git repositories",
+                    "✓".green(),
+                    git_repos.len()
+                );
 
                 let git_logs_dir = output_dir.join("git-logs");
                 std::fs::create_dir_all(&git_logs_dir)?;
 
                 for (idx, repo) in git_repos.iter().enumerate() {
-                    let repo_name = repo.file_name()
+                    let repo_name = repo
+                        .file_name()
                         .and_then(|n| n.to_str())
                         .unwrap_or("unknown");
 
@@ -632,7 +646,12 @@ async fn main() -> Result<()> {
                     let output = std::process::Command::new("git")
                         .arg("-C")
                         .arg(repo)
-                        .args(&["log", "--all", "--pretty=format:%H|%an|%ae|%at|%s", "--no-merges"])
+                        .args(&[
+                            "log",
+                            "--all",
+                            "--pretty=format:%H|%an|%ae|%at|%s",
+                            "--no-merges",
+                        ])
                         .output()?;
 
                     std::fs::write(&log_file, &output.stdout)?;
@@ -644,19 +663,33 @@ async fn main() -> Result<()> {
 
                 // Create archive of git logs
                 let git_archive = if timestamp {
-                    output_dir.join(format!("git-logs-{}.tar.gz", chrono::Utc::now().format("%Y%m%d-%H%M%S")))
+                    output_dir.join(format!(
+                        "git-logs-{}.tar.gz",
+                        chrono::Utc::now().format("%Y%m%d-%H%M%S")
+                    ))
                 } else {
                     output_dir.join("git-logs.tar.gz")
                 };
 
                 std::process::Command::new("tar")
-                    .args(&["-czf", git_archive.to_str().unwrap(), "-C", output_dir.to_str().unwrap(), "git-logs"])
+                    .args(&[
+                        "-czf",
+                        git_archive.to_str().unwrap(),
+                        "-C",
+                        output_dir.to_str().unwrap(),
+                        "git-logs",
+                    ])
                     .status()?;
 
                 std::fs::remove_dir_all(&git_logs_dir)?;
 
                 let size = std::fs::metadata(&git_archive)?.len() as f64 / 1024.0 / 1024.0;
-                println!("  {} Git logs archive: {:.1} MB ({} repos)", "✓".green(), size, git_repos.len());
+                println!(
+                    "  {} Git logs archive: {:.1} MB ({} repos)",
+                    "✓".green(),
+                    size,
+                    git_repos.len()
+                );
             }
 
             // Shell history backup (sanitized)
@@ -683,19 +716,33 @@ async fn main() -> Result<()> {
 
                     // Create archive
                     let history_archive = if timestamp {
-                        output_dir.join(format!("shell-history-{}.tar.gz", chrono::Utc::now().format("%Y%m%d-%H%M%S")))
+                        output_dir.join(format!(
+                            "shell-history-{}.tar.gz",
+                            chrono::Utc::now().format("%Y%m%d-%H%M%S")
+                        ))
                     } else {
                         output_dir.join("shell-history.tar.gz")
                     };
 
                     std::process::Command::new("tar")
-                        .args(&["-czf", history_archive.to_str().unwrap(), "-C", output_dir.to_str().unwrap(), "shell-history"])
+                        .args(&[
+                            "-czf",
+                            history_archive.to_str().unwrap(),
+                            "-C",
+                            output_dir.to_str().unwrap(),
+                            "shell-history",
+                        ])
                         .status()?;
 
                     std::fs::remove_dir_all(&history_dir)?;
 
                     let size = std::fs::metadata(&history_archive)?.len() as f64 / 1024.0;
-                    println!("  {} Shell history: {:.1} KB ({} commands, sanitized)", "✓".green(), size, total_lines);
+                    println!(
+                        "  {} Shell history: {:.1} KB ({} commands, sanitized)",
+                        "✓".green(),
+                        size,
+                        total_lines
+                    );
                 } else {
                     println!("  {} No shell history files found", "⚠".yellow());
                 }
@@ -706,7 +753,12 @@ async fn main() -> Result<()> {
                 use comprehensive_backup_analytics::{ComprehensiveAnalyticsEngine, Priority};
 
                 println!();
-                println!("{}", "🔬 Running Comprehensive Productivity Analysis...".cyan().bold());
+                println!(
+                    "{}",
+                    "🔬 Running Comprehensive Productivity Analysis..."
+                        .cyan()
+                        .bold()
+                );
                 println!();
 
                 // Run comprehensive analytics
@@ -715,7 +767,10 @@ async fn main() -> Result<()> {
 
                 // Save full report
                 let report_file = output_dir.join(if timestamp {
-                    format!("comprehensive-analytics-{}.json", chrono::Utc::now().format("%Y%m%d-%H%M%S"))
+                    format!(
+                        "comprehensive-analytics-{}.json",
+                        chrono::Utc::now().format("%Y%m%d-%H%M%S")
+                    )
                 } else {
                     "comprehensive-analytics.json".to_string()
                 });
@@ -724,9 +779,20 @@ async fn main() -> Result<()> {
                 std::fs::write(&report_file, &json)?;
 
                 // Display human-readable analytics
-                println!("{}", "═══════════════════════════════════════════════════".cyan());
-                println!("{}", "           📊 YOUR PRODUCTIVITY ANALYSIS            ".cyan().bold());
-                println!("{}", "═══════════════════════════════════════════════════".cyan());
+                println!(
+                    "{}",
+                    "═══════════════════════════════════════════════════".cyan()
+                );
+                println!(
+                    "{}",
+                    "           📊 YOUR PRODUCTIVITY ANALYSIS            "
+                        .cyan()
+                        .bold()
+                );
+                println!(
+                    "{}",
+                    "═══════════════════════════════════════════════════".cyan()
+                );
                 println!();
 
                 // Overall Score
@@ -738,21 +804,57 @@ async fn main() -> Result<()> {
                     _ => "red",
                 };
 
-                println!("{}", format!("🎯 Overall Productivity Score: {:.0}/100 (Grade: {})", score.overall, score.grade).color(grade_color).bold());
+                println!(
+                    "{}",
+                    format!(
+                        "🎯 Overall Productivity Score: {:.0}/100 (Grade: {})",
+                        score.overall, score.grade
+                    )
+                    .color(grade_color)
+                    .bold()
+                );
                 println!();
                 println!("{}", "  Breakdown:".yellow());
-                println!("    • AI Effectiveness:   {:.0}/100  (40% weight)", score.ai_effectiveness);
-                println!("    • Shell Efficiency:   {:.0}/100  (30% weight)", score.shell_efficiency);
-                println!("    • Workflow Quality:   {:.0}/100  (30% weight)", score.workflow_quality);
+                println!(
+                    "    • AI Effectiveness:   {:.0}/100  (40% weight)",
+                    score.ai_effectiveness
+                );
+                println!(
+                    "    • Shell Efficiency:   {:.0}/100  (30% weight)",
+                    score.shell_efficiency
+                );
+                println!(
+                    "    • Workflow Quality:   {:.0}/100  (30% weight)",
+                    score.workflow_quality
+                );
                 println!();
 
                 // AI Impact Summary
                 let ai = &comprehensive.ai_impact;
                 println!("{}", "🤖 AI Impact on Productivity".yellow().bold());
-                println!("    • AI-Assisted Commits: {} ({:.1}%)", ai.ai_assisted_commits.to_string().green(), ai.ai_assistance_rate);
-                println!("    • Velocity Improvement: {}{:.1}%", if ai.velocity_improvement > 0.0 { "+" } else { "" }, ai.velocity_improvement);
-                println!("    • Code Volume: {} lines with AI ({:.1}%)", ai.lines_written_with_ai.to_string().green(), ai.ai_contribution_percentage);
-                println!("    • Copy-Paste Incidents: {}", ai.copy_paste_incidents.to_string().red());
+                println!(
+                    "    • AI-Assisted Commits: {} ({:.1}%)",
+                    ai.ai_assisted_commits.to_string().green(),
+                    ai.ai_assistance_rate
+                );
+                println!(
+                    "    • Velocity Improvement: {}{:.1}%",
+                    if ai.velocity_improvement > 0.0 {
+                        "+"
+                    } else {
+                        ""
+                    },
+                    ai.velocity_improvement
+                );
+                println!(
+                    "    • Code Volume: {} lines with AI ({:.1}%)",
+                    ai.lines_written_with_ai.to_string().green(),
+                    ai.ai_contribution_percentage
+                );
+                println!(
+                    "    • Copy-Paste Incidents: {}",
+                    ai.copy_paste_incidents.to_string().red()
+                );
                 println!();
 
                 // Shell Productivity
@@ -762,26 +864,55 @@ async fn main() -> Result<()> {
                 println!("    • Failure Rate: {:.1}%", shell.failure_rate);
                 println!("    • Time Wasted: {:.1} hours", shell.time_wasted_hours);
                 println!("    • Struggle Sessions: {}", shell.struggle_sessions.len());
-                println!("    • Productivity Score: {:.0}/100", shell.productivity_score);
+                println!(
+                    "    • Productivity Score: {:.0}/100",
+                    shell.productivity_score
+                );
                 println!();
 
                 // Workflow Patterns
                 let workflow = &comprehensive.workflow_patterns;
                 println!("{}", "🔗 Workflow Correlation Analysis".yellow().bold());
-                println!("    • Full Cycle Workflows: {} (Struggle → AI → Commit)", workflow.full_cycle_instances);
-                println!("    • AI Helpfulness Rate: {:.1}%", workflow.ai_helpfulness_rate);
-                println!("    • Shell → AI: {} instances", workflow.struggle_to_ai_instances);
-                println!("    • AI → Commit: {} instances", workflow.ai_to_commit_instances);
+                println!(
+                    "    • Full Cycle Workflows: {} (Struggle → AI → Commit)",
+                    workflow.full_cycle_instances
+                );
+                println!(
+                    "    • AI Helpfulness Rate: {:.1}%",
+                    workflow.ai_helpfulness_rate
+                );
+                println!(
+                    "    • Shell → AI: {} instances",
+                    workflow.struggle_to_ai_instances
+                );
+                println!(
+                    "    • AI → Commit: {} instances",
+                    workflow.ai_to_commit_instances
+                );
                 println!();
 
                 // Actionable Recommendations
-                println!("{}", "═══════════════════════════════════════════════════".cyan());
-                println!("{}", "           🎯 ACTIONABLE RECOMMENDATIONS            ".cyan().bold());
-                println!("{}", "═══════════════════════════════════════════════════".cyan());
+                println!(
+                    "{}",
+                    "═══════════════════════════════════════════════════".cyan()
+                );
+                println!(
+                    "{}",
+                    "           🎯 ACTIONABLE RECOMMENDATIONS            "
+                        .cyan()
+                        .bold()
+                );
+                println!(
+                    "{}",
+                    "═══════════════════════════════════════════════════".cyan()
+                );
                 println!();
 
                 if comprehensive.actionable_recommendations.is_empty() {
-                    println!("{}", "  ✨ Everything looks great! Keep up the good work!".green());
+                    println!(
+                        "{}",
+                        "  ✨ Everything looks great! Keep up the good work!".green()
+                    );
                 } else {
                     for (idx, rec) in comprehensive.actionable_recommendations.iter().enumerate() {
                         let priority_emoji = match rec.priority {
@@ -797,7 +928,12 @@ async fn main() -> Result<()> {
                             Priority::Low => "LOW".green(),
                         };
 
-                        println!("{} {} - {}", priority_emoji, priority_text.bold(), rec.category.cyan());
+                        println!(
+                            "{} {} - {}",
+                            priority_emoji,
+                            priority_text.bold(),
+                            rec.category.cyan()
+                        );
                         println!("  Issue: {}", rec.issue);
                         println!("  Action: {}", rec.action.green());
                         println!("  Impact: {}", rec.potential_impact.yellow());
@@ -809,9 +945,16 @@ async fn main() -> Result<()> {
                 }
 
                 println!();
-                println!("{}", "═══════════════════════════════════════════════════".cyan());
+                println!(
+                    "{}",
+                    "═══════════════════════════════════════════════════".cyan()
+                );
                 println!();
-                println!("  {} Full analysis saved: {}", "✓".green(), report_file.display());
+                println!(
+                    "  {} Full analysis saved: {}",
+                    "✓".green(),
+                    report_file.display()
+                );
                 println!();
             }
 
@@ -1838,9 +1981,8 @@ async fn main() -> Result<()> {
                         let custom_endpoint = endpoint.ok_or_else(|| {
                             anyhow::anyhow!("Custom provider requires --endpoint")
                         })?;
-                        let custom_model = model.ok_or_else(|| {
-                            anyhow::anyhow!("Custom provider requires --model")
-                        })?;
+                        let custom_model = model
+                            .ok_or_else(|| anyhow::anyhow!("Custom provider requires --model"))?;
                         claude_config::ClaudeConfig::custom(custom_endpoint, key, custom_model)
                     } else {
                         let mut cfg = claude_config::ClaudeConfig::new(provider_enum.clone(), key);
@@ -1874,7 +2016,10 @@ async fn main() -> Result<()> {
                         println!("Applying configuration to Claude Code...");
                         config.write_claude_code_config()?;
                         println!();
-                        println!("{} Claude Code configuration updated!", "Success:".green().bold());
+                        println!(
+                            "{} Claude Code configuration updated!",
+                            "Success:".green().bold()
+                        );
                         println!("Restart Claude Code for changes to take effect.");
                     } else {
                         println!("Use --apply flag to write configuration to Claude Code's config files.");
@@ -1900,7 +2045,14 @@ async fn main() -> Result<()> {
             Ok(())
         }
 
-        Commands::Timeline { base_dir, png, print, cluster, months, skip_noise } => {
+        Commands::Timeline {
+            base_dir,
+            png,
+            print,
+            cluster,
+            months,
+            skip_noise,
+        } => {
             use colored::Colorize;
             use timeline::TimelineAnalyzer;
             use timeline_png::export_timeline_png;
@@ -1914,7 +2066,10 @@ async fn main() -> Result<()> {
             let timeline = analyzer.analyze_with_options(months, cluster, skip_noise)?;
 
             if timeline.sessions.is_empty() {
-                println!("{}", "No sessions found. Start coding to build your timeline!".yellow());
+                println!(
+                    "{}",
+                    "No sessions found. Start coding to build your timeline!".yellow()
+                );
                 return Ok(());
             }
 
@@ -1922,7 +2077,8 @@ async fn main() -> Result<()> {
             println!("\n{}", "📅 Your Coding Journey Timeline".cyan().bold());
             println!("═══════════════════════════════════════════════\n");
             println!("  Total Sessions: {}", timeline.stats.total_sessions);
-            println!("  ✓ Completed: {} | ✗ Abandoned: {} | ↻ Resumed: {} | ● Ongoing: {}",
+            println!(
+                "  ✓ Completed: {} | ✗ Abandoned: {} | ↻ Resumed: {} | ● Ongoing: {}",
                 timeline.stats.completed.to_string().green(),
                 timeline.stats.abandoned.to_string().red(),
                 timeline.stats.resumed.to_string().yellow(),
@@ -1931,7 +2087,10 @@ async fn main() -> Result<()> {
             println!("  Completion Rate: {:.1}%", timeline.stats.completion_rate);
             println!("  Avg Session: {:.1}h", timeline.stats.avg_session_hours);
             println!("  Context Switches: {}", timeline.stats.context_switches);
-            println!("  Most Worked: {}", timeline.stats.most_worked_project.green());
+            println!(
+                "  Most Worked: {}",
+                timeline.stats.most_worked_project.green()
+            );
 
             if cluster {
                 println!("  {} Clustering enabled (2-hour windows)", "ℹ".cyan());
@@ -1964,7 +2123,11 @@ async fn main() -> Result<()> {
 
             // Export to PNG
             if let Some(png_path) = png {
-                println!("\n{} {}", "Generating PNG timeline:".cyan(), png_path.display());
+                println!(
+                    "\n{} {}",
+                    "Generating PNG timeline:".cyan(),
+                    png_path.display()
+                );
                 export_timeline_png(&timeline, &png_path)?;
                 println!("{} Timeline exported!", "✅".green());
 
@@ -1977,7 +2140,14 @@ async fn main() -> Result<()> {
             Ok(())
         }
 
-        Commands::GitInfographics { repos, output, open, scan_all, cached, progress } => {
+        Commands::GitInfographics {
+            repos,
+            output,
+            open,
+            scan_all,
+            cached,
+            progress,
+        } => {
             use colored::Colorize;
             use git_infographics::{GitInfographicsGenerator, InfographicsConfig};
             use walkdir::WalkDir;
@@ -2001,14 +2171,20 @@ async fn main() -> Result<()> {
                     }
                 }
 
-                println!("  Found {} git repositories", found_repos.len().to_string().green());
+                println!(
+                    "  Found {} git repositories",
+                    found_repos.len().to_string().green()
+                );
                 found_repos
             } else {
                 repos
             };
 
             if git_repos.is_empty() {
-                println!("{}", "No git repositories found. Specify repos with -r or use --scan-all".yellow());
+                println!(
+                    "{}",
+                    "No git repositories found. Specify repos with -r or use --scan-all".yellow()
+                );
                 return Ok(());
             }
 
@@ -2037,9 +2213,16 @@ async fn main() -> Result<()> {
             }
 
             if !progress {
-                println!("  Total Commits: {}", stats.total_commits.to_string().green());
-                println!("  Total Authors: {}", stats.total_authors.to_string().green());
-                println!("  Date Range: {} to {}",
+                println!(
+                    "  Total Commits: {}",
+                    stats.total_commits.to_string().green()
+                );
+                println!(
+                    "  Total Authors: {}",
+                    stats.total_authors.to_string().green()
+                );
+                println!(
+                    "  Date Range: {} to {}",
                     stats.date_range.0.to_string().yellow(),
                     stats.date_range.1.to_string().yellow()
                 );
@@ -2047,7 +2230,10 @@ async fn main() -> Result<()> {
             }
             let generated = generator.generate_all(&stats)?;
 
-            println!("\n{}", "✅ Infographics generated successfully!".green().bold());
+            println!(
+                "\n{}",
+                "✅ Infographics generated successfully!".green().bold()
+            );
             println!("\n📁 Output files:");
             for path in &generated {
                 println!("   • {}", path.display());
@@ -2058,12 +2244,18 @@ async fn main() -> Result<()> {
                 println!("\n{}", "🌐 Opening infographics...".cyan());
                 for path in &generated {
                     if open::that(path).is_err() {
-                        println!("   (Could not auto-open {} - please open manually)", path.display());
+                        println!(
+                            "   (Could not auto-open {} - please open manually)",
+                            path.display()
+                        );
                     }
                 }
             }
 
-            println!("\n{}", "💡 Tip: Use --scan-all to analyze all repos in your home directory".dimmed());
+            println!(
+                "\n{}",
+                "💡 Tip: Use --scan-all to analyze all repos in your home directory".dimmed()
+            );
 
             Ok(())
         }

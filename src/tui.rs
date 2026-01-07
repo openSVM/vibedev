@@ -12,14 +12,11 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{
-    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    layout::{Constraint, Direction, Layout, Rect},
     prelude::CrosstermBackend,
-    style::{Color, Modifier, Style, Stylize},
-    symbols,
+    style::{Color, Style, Stylize},
     text::{Line, Span},
-    widgets::{
-        Block, Borders, Paragraph, Row, Sparkline, Table, Tabs,
-    },
+    widgets::{Block, Borders, Paragraph, Row, Sparkline, Table, Tabs},
     Frame, Terminal,
 };
 use std::collections::{HashMap, VecDeque};
@@ -230,7 +227,13 @@ impl App {
         let recent = self.history.cost.back().cloned().unwrap_or(0.0);
         let previous = self.history.cost.front().cloned().unwrap_or(0.0);
         let change = recent - previous;
-        let trend = if change > 0.5 { "↑" } else if change < -0.5 { "↓" } else { "→" };
+        let trend = if change > 0.5 {
+            "↑"
+        } else if change < -0.5 {
+            "↓"
+        } else {
+            "→"
+        };
         (change, trend)
     }
 }
@@ -319,7 +322,13 @@ fn ui(f: &mut Frame, app: &App) {
 }
 
 fn render_header(f: &mut Frame, app: &App, area: Rect) {
-    let titles = vec!["[1] Overview", "[2] Analysis", "[3] Tools", "[4] Timeline", "[5] Git Infographics"];
+    let titles = vec![
+        "[1] Overview",
+        "[2] Analysis",
+        "[3] Tools",
+        "[4] Timeline",
+        "[5] Git Infographics",
+    ];
 
     let title = if app.current_branch.is_empty() {
         " vibecheck ".to_string()
@@ -352,9 +361,9 @@ fn render_overview(f: &mut Frame, app: &App, area: Rect) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(7),   // Summary
-            Constraint::Length(9),   // Cost trend
-            Constraint::Min(10),     // Tool breakdown
+            Constraint::Length(7), // Summary
+            Constraint::Length(9), // Cost trend
+            Constraint::Min(10),   // Tool breakdown
         ])
         .split(area);
 
@@ -372,29 +381,47 @@ fn render_overview(f: &mut Frame, app: &App, area: Rect) {
     };
 
     let (cost_change, trend) = app.get_cost_trend();
-    let trend_color = if cost_change > 0.5 { Color::Red } else if cost_change < -0.5 { Color::Green } else { Color::Yellow };
+    let trend_color = if cost_change > 0.5 {
+        Color::Red
+    } else if cost_change < -0.5 {
+        Color::Green
+    } else {
+        Color::Yellow
+    };
 
     let summary_lines = vec![
         Line::from(""),
         Line::from(vec![
             Span::raw("  Total Cost:      "),
-            Span::styled(format!("${:.2}", app.estimated_cost), Style::default().fg(Color::Yellow).bold()),
+            Span::styled(
+                format!("${:.2}", app.estimated_cost),
+                Style::default().fg(Color::Yellow).bold(),
+            ),
             Span::raw("  "),
             Span::styled(trend, Style::default().fg(trend_color)),
         ]),
         Line::from(vec![
             Span::raw("  Conversations:   "),
-            Span::styled(format!("{}", app.total_conversations), Style::default().fg(Color::Cyan)),
+            Span::styled(
+                format!("{}", app.total_conversations),
+                Style::default().fg(Color::Cyan),
+            ),
             Span::raw(format!("  (${:.3}/conv)", cost_per_conv)),
         ]),
         Line::from(vec![
             Span::raw("  Messages:        "),
-            Span::styled(format!("{}", app.total_messages), Style::default().fg(Color::Green)),
+            Span::styled(
+                format!("{}", app.total_messages),
+                Style::default().fg(Color::Green),
+            ),
             Span::raw(format!("  ({:.1} msg/conv)", conv_per_msg)),
         ]),
         Line::from(vec![
             Span::raw("  Tokens:          "),
-            Span::styled(format_tokens(app.estimated_tokens), Style::default().fg(Color::Magenta)),
+            Span::styled(
+                format_tokens(app.estimated_tokens),
+                Style::default().fg(Color::Magenta),
+            ),
         ]),
     ];
 
@@ -403,7 +430,12 @@ fn render_overview(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(summary, chunks[0]);
 
     // Cost over time
-    let cost_data: Vec<u64> = app.history.cost.iter().map(|&x| (x * 100.0) as u64).collect();
+    let cost_data: Vec<u64> = app
+        .history
+        .cost
+        .iter()
+        .map(|&x| (x * 100.0) as u64)
+        .collect();
     if !cost_data.is_empty() {
         let max_cost = *cost_data.iter().max().unwrap_or(&1).max(&1);
         let cost_sparkline = Sparkline::default()
@@ -438,10 +470,7 @@ fn render_analysis(f: &mut Frame, app: &App, area: Rect) {
 fn render_efficiency(f: &mut Frame, app: &App, area: Rect) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(10),
-            Constraint::Min(5),
-        ])
+        .constraints([Constraint::Length(10), Constraint::Min(5)])
         .split(area);
 
     let tokens_per_conv = if app.total_conversations > 0 {
@@ -460,11 +489,17 @@ fn render_efficiency(f: &mut Frame, app: &App, area: Rect) {
         Line::from(""),
         Line::from(vec![
             Span::raw("  Tokens/Conv:     "),
-            Span::styled(format!("{:.0}", tokens_per_conv), Style::default().fg(Color::Yellow).bold()),
+            Span::styled(
+                format!("{:.0}", tokens_per_conv),
+                Style::default().fg(Color::Yellow).bold(),
+            ),
         ]),
         Line::from(vec![
             Span::raw("  Cost/1K tokens:  "),
-            Span::styled(format!("${:.4}", cost_per_1k_tokens), Style::default().fg(Color::Cyan)),
+            Span::styled(
+                format!("${:.4}", cost_per_1k_tokens),
+                Style::default().fg(Color::Cyan),
+            ),
         ]),
         Line::from(""),
         Line::from(vec![
@@ -477,11 +512,13 @@ fn render_efficiency(f: &mut Frame, app: &App, area: Rect) {
                 } else {
                     "High token usage"
                 },
-                Style::default().fg(
-                    if tokens_per_conv < 30000.0 { Color::Green }
-                    else if tokens_per_conv < 100000.0 { Color::Yellow }
-                    else { Color::Red }
-                )
+                Style::default().fg(if tokens_per_conv < 30000.0 {
+                    Color::Green
+                } else if tokens_per_conv < 100000.0 {
+                    Color::Yellow
+                } else {
+                    Color::Red
+                }),
             ),
         ]),
     ];
@@ -510,7 +547,10 @@ fn render_efficiency(f: &mut Frame, app: &App, area: Rect) {
 fn render_activity(f: &mut Frame, app: &App, area: Rect) {
     let mut heatmap_lines = vec![
         Line::from(""),
-        Line::from(Span::styled("  24-Hour Activity", Style::default().fg(Color::White).bold())),
+        Line::from(Span::styled(
+            "  24-Hour Activity",
+            Style::default().fg(Color::White).bold(),
+        )),
         Line::from(""),
     ];
 
@@ -567,8 +607,11 @@ fn render_activity(f: &mut Frame, app: &App, area: Rect) {
         ),
     ]));
 
-    let heatmap = Paragraph::new(heatmap_lines)
-        .block(Block::default().borders(Borders::ALL).title(" Activity Pattern "));
+    let heatmap = Paragraph::new(heatmap_lines).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title(" Activity Pattern "),
+    );
     f.render_widget(heatmap, area);
 }
 
@@ -699,46 +742,69 @@ fn render_timeline(f: &mut Frame, app: &App, area: Rect) {
         Line::from(""),
         Line::from(vec![
             Span::raw("  Total Sessions:   "),
-            Span::styled(format!("{}", timeline.stats.total_sessions), Style::default().fg(Color::Cyan).bold()),
+            Span::styled(
+                format!("{}", timeline.stats.total_sessions),
+                Style::default().fg(Color::Cyan).bold(),
+            ),
         ]),
         Line::from(vec![
             Span::raw("  Completed:        "),
-            Span::styled(format!("{}", timeline.stats.completed), Style::default().fg(Color::Green).bold()),
+            Span::styled(
+                format!("{}", timeline.stats.completed),
+                Style::default().fg(Color::Green).bold(),
+            ),
             Span::raw(format!(" ({:.0}%)", timeline.stats.completion_rate)),
         ]),
         Line::from(vec![
             Span::raw("  Abandoned:        "),
-            Span::styled(format!("{}", timeline.stats.abandoned), Style::default().fg(Color::Red).bold()),
+            Span::styled(
+                format!("{}", timeline.stats.abandoned),
+                Style::default().fg(Color::Red).bold(),
+            ),
         ]),
         Line::from(vec![
             Span::raw("  Ongoing:          "),
-            Span::styled(format!("{}", timeline.stats.ongoing), Style::default().fg(Color::Yellow).bold()),
+            Span::styled(
+                format!("{}", timeline.stats.ongoing),
+                Style::default().fg(Color::Yellow).bold(),
+            ),
         ]),
         Line::from(""),
         Line::from(vec![
             Span::raw("  Avg Session:      "),
-            Span::styled(format!("{:.1}h", timeline.stats.avg_session_hours), Style::default().fg(Color::Magenta)),
+            Span::styled(
+                format!("{:.1}h", timeline.stats.avg_session_hours),
+                Style::default().fg(Color::Magenta),
+            ),
         ]),
         Line::from(vec![
             Span::raw("  Context Switches: "),
-            Span::styled(format!("{}", timeline.stats.context_switches), Style::default().fg(Color::Yellow)),
+            Span::styled(
+                format!("{}", timeline.stats.context_switches),
+                Style::default().fg(Color::Yellow),
+            ),
         ]),
         Line::from(vec![
             Span::raw("  Most Worked:      "),
-            Span::styled(&timeline.stats.most_worked_project, Style::default().fg(Color::Cyan)),
+            Span::styled(
+                &timeline.stats.most_worked_project,
+                Style::default().fg(Color::Cyan),
+            ),
         ]),
     ];
 
-    let stats_box = Paragraph::new(stats_lines)
-        .block(Block::default().borders(Borders::ALL).title(" Your Coding Journey Stats "));
+    let stats_box = Paragraph::new(stats_lines).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title(" Your Coding Journey Stats "),
+    );
     f.render_widget(stats_box, chunks[0]);
 
     // Timeline visualization
-    let mut timeline_lines = vec![
-        Line::from(""),
-    ];
+    let mut timeline_lines = vec![Line::from("")];
 
-    let visible_sessions: Vec<_> = timeline.sessions
+    let visible_sessions: Vec<_> = timeline
+        .sessions
         .iter()
         .skip(app.scroll_offset)
         .take(20)
@@ -763,24 +829,34 @@ fn render_timeline(f: &mut Frame, app: &App, area: Rect) {
             let bar = "━".repeat(bar_len.max(1));
 
             timeline_lines.push(Line::from(vec![
-                Span::styled(session.start.format("%Y-%m-%d").to_string(), Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    session.start.format("%Y-%m-%d").to_string(),
+                    Style::default().fg(Color::DarkGray),
+                ),
                 Span::raw("  "),
                 Span::styled("●", Style::default().fg(outcome_color)),
                 Span::styled(bar, Style::default().fg(outcome_color)),
-                Span::styled(session.outcome.symbol().to_string(), Style::default().fg(outcome_color).bold()),
+                Span::styled(
+                    session.outcome.symbol().to_string(),
+                    Style::default().fg(outcome_color).bold(),
+                ),
                 Span::raw("  "),
-                Span::styled(session.description.clone(), Style::default().fg(Color::White)),
+                Span::styled(
+                    session.description.clone(),
+                    Style::default().fg(Color::White),
+                ),
             ]));
 
             timeline_lines.push(Line::from(vec![
                 Span::raw("            "),
                 Span::styled(
-                    format!("{:.1}h | {} convos | {}",
+                    format!(
+                        "{:.1}h | {} convos | {}",
                         session.hours,
                         session.conversations,
                         session.outcome.description()
                     ),
-                    Style::default().fg(Color::DarkGray)
+                    Style::default().fg(Color::DarkGray),
                 ),
             ]));
             timeline_lines.push(Line::from(""));
@@ -788,25 +864,32 @@ fn render_timeline(f: &mut Frame, app: &App, area: Rect) {
     }
 
     if app.scroll_offset > 0 {
-        timeline_lines.insert(1, Line::from(vec![
-            Span::raw("  "),
-            Span::styled("↑ Scroll up for more ↑", Style::default().fg(Color::Yellow)),
-        ]));
+        timeline_lines.insert(
+            1,
+            Line::from(vec![
+                Span::raw("  "),
+                Span::styled("↑ Scroll up for more ↑", Style::default().fg(Color::Yellow)),
+            ]),
+        );
     }
 
     if app.scroll_offset + 20 < timeline.sessions.len() {
         timeline_lines.push(Line::from(vec![
             Span::raw("  "),
-            Span::styled("↓ Scroll down for more ↓", Style::default().fg(Color::Yellow)),
+            Span::styled(
+                "↓ Scroll down for more ↓",
+                Style::default().fg(Color::Yellow),
+            ),
         ]));
     }
 
-    let timeline_para = Paragraph::new(timeline_lines)
-        .block(Block::default().borders(Borders::ALL).title(format!(
+    let timeline_para = Paragraph::new(timeline_lines).block(
+        Block::default().borders(Borders::ALL).title(format!(
             " Timeline ({}/{}) ",
             app.scroll_offset + visible_sessions.len().min(20),
             timeline.sessions.len()
-        )));
+        )),
+    );
     f.render_widget(timeline_para, chunks[1]);
 }
 
@@ -818,9 +901,10 @@ fn render_infographics(f: &mut Frame, _app: &App, area: Rect) {
 
     let mut info_lines = vec![
         Line::from(""),
-        Line::from(vec![
-            Span::styled("  Git Infographics Generator  ", Style::default().fg(Color::Cyan).bold()),
-        ]),
+        Line::from(vec![Span::styled(
+            "  Git Infographics Generator  ",
+            Style::default().fg(Color::Cyan).bold(),
+        )]),
         Line::from(""),
     ];
 
@@ -832,18 +916,28 @@ fn render_infographics(f: &mut Frame, _app: &App, area: Rect) {
         info_lines.push(Line::from(""));
 
         // List generated files
-        info_lines.push(Line::from(vec![
-            Span::styled("  Generated Infographics:", Style::default().fg(Color::Yellow)),
-        ]));
+        info_lines.push(Line::from(vec![Span::styled(
+            "  Generated Infographics:",
+            Style::default().fg(Color::Yellow),
+        )]));
 
         let infographic_files = vec![
             ("commit_heatmap.png", "Calendar heatmap of daily commits"),
-            ("top_contributors.png", "Top 15 contributors by commit count"),
-            ("activity_timeline.png", "Commit activity over time (monthly)"),
+            (
+                "top_contributors.png",
+                "Top 15 contributors by commit count",
+            ),
+            (
+                "activity_timeline.png",
+                "Commit activity over time (monthly)",
+            ),
             ("hourly_activity.png", "Commits by hour of day"),
             ("weekday_distribution.png", "Commits by day of week"),
             ("message_quality.png", "Commit message length distribution"),
-            ("code_contribution.png", "Lines added/deleted by top contributors"),
+            (
+                "code_contribution.png",
+                "Lines added/deleted by top contributors",
+            ),
         ];
 
         for (filename, description) in infographic_files {
@@ -874,7 +968,10 @@ fn render_infographics(f: &mut Frame, _app: &App, area: Rect) {
         info_lines.push(Line::from(""));
         info_lines.push(Line::from(vec![
             Span::styled("  Output Directory: ", Style::default().fg(Color::White)),
-            Span::styled(infographics_dir.display().to_string(), Style::default().fg(Color::Magenta)),
+            Span::styled(
+                infographics_dir.display().to_string(),
+                Style::default().fg(Color::Magenta),
+            ),
         ]));
     } else {
         info_lines.push(Line::from(vec![
@@ -884,39 +981,61 @@ fn render_infographics(f: &mut Frame, _app: &App, area: Rect) {
         info_lines.push(Line::from(""));
         info_lines.push(Line::from(vec![
             Span::raw("  "),
-            Span::styled("No infographics found at ", Style::default().fg(Color::DarkGray)),
-            Span::styled(infographics_dir.display().to_string(), Style::default().fg(Color::Magenta)),
+            Span::styled(
+                "No infographics found at ",
+                Style::default().fg(Color::DarkGray),
+            ),
+            Span::styled(
+                infographics_dir.display().to_string(),
+                Style::default().fg(Color::Magenta),
+            ),
         ]));
     }
 
     info_lines.push(Line::from(""));
     info_lines.push(Line::from(""));
-    info_lines.push(Line::from(vec![
-        Span::styled("  Commands:", Style::default().fg(Color::Yellow)),
-    ]));
+    info_lines.push(Line::from(vec![Span::styled(
+        "  Commands:",
+        Style::default().fg(Color::Yellow),
+    )]));
     info_lines.push(Line::from(vec![
         Span::raw("    "),
-        Span::styled("vibedev git-infographics", Style::default().fg(Color::Cyan).bold()),
+        Span::styled(
+            "vibedev git-infographics",
+            Style::default().fg(Color::Cyan).bold(),
+        ),
         Span::raw("  - Analyze current directory"),
     ]));
     info_lines.push(Line::from(vec![
         Span::raw("    "),
-        Span::styled("vibedev git-infographics --scan-all", Style::default().fg(Color::Cyan).bold()),
+        Span::styled(
+            "vibedev git-infographics --scan-all",
+            Style::default().fg(Color::Cyan).bold(),
+        ),
         Span::raw("  - Scan all repos in $HOME"),
     ]));
     info_lines.push(Line::from(vec![
         Span::raw("    "),
-        Span::styled("vibedev git-infographics -r /path/to/repo", Style::default().fg(Color::Cyan).bold()),
+        Span::styled(
+            "vibedev git-infographics -r /path/to/repo",
+            Style::default().fg(Color::Cyan).bold(),
+        ),
         Span::raw("  - Analyze specific repo"),
     ]));
     info_lines.push(Line::from(vec![
         Span::raw("    "),
-        Span::styled("vibedev git-infographics --open", Style::default().fg(Color::Cyan).bold()),
+        Span::styled(
+            "vibedev git-infographics --open",
+            Style::default().fg(Color::Cyan).bold(),
+        ),
         Span::raw("  - Open in browser"),
     ]));
 
-    let para = Paragraph::new(info_lines)
-        .block(Block::default().borders(Borders::ALL).title(" Git Infographics "));
+    let para = Paragraph::new(info_lines).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title(" Git Infographics "),
+    );
 
     f.render_widget(para, area);
 }
@@ -952,7 +1071,10 @@ fn format_tokens(tokens: u64) -> String {
 pub fn print_cli_output(base_dir: PathBuf) -> Result<()> {
     use colored::Colorize as ColoredColorize;
 
-    println!("{}", ColoredColorize::bold(ColoredColorize::cyan("vibedev")));
+    println!(
+        "{}",
+        ColoredColorize::bold(ColoredColorize::cyan("vibedev"))
+    );
     println!();
 
     let discovery = crate::discovery::LogDiscovery::new(base_dir.clone(), true);
@@ -984,11 +1106,23 @@ pub fn print_cli_output(base_dir: PathBuf) -> Result<()> {
     }
 
     println!();
-    println!("  Total: {}", ColoredColorize::yellow(format_bytes(findings.total_size_bytes).as_str()));
-    println!("  Tokens: {}", ColoredColorize::magenta(format_tokens(estimated_tokens).as_str()));
-    println!("  Cost: {}", ColoredColorize::bold(format!("${:.2}", estimated_cost).as_str()));
+    println!(
+        "  Total: {}",
+        ColoredColorize::yellow(format_bytes(findings.total_size_bytes).as_str())
+    );
+    println!(
+        "  Tokens: {}",
+        ColoredColorize::magenta(format_tokens(estimated_tokens).as_str())
+    );
+    println!(
+        "  Cost: {}",
+        ColoredColorize::bold(format!("${:.2}", estimated_cost).as_str())
+    );
     println!();
-    println!("{}", ColoredColorize::bright_black("Run 'vibedev tui' for live monitoring"));
+    println!(
+        "{}",
+        ColoredColorize::bright_black("Run 'vibedev tui' for live monitoring")
+    );
 
     Ok(())
 }

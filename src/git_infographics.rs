@@ -1,11 +1,9 @@
 // Git Infographics Generator - Beautiful visualizations from git history
 use anyhow::Result;
 use chrono::{DateTime, Datelike, Duration, NaiveDate, Timelike};
-use fxhash::FxHashMap;
 use indicatif::{ProgressBar, ProgressStyle};
-use md5::{Md5, Digest};
+use md5::{Digest, Md5};
 use plotters::prelude::*;
-use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -83,7 +81,10 @@ impl GitStats {
             commits: Vec::new(),
             total_commits: 0,
             total_authors: 0,
-            date_range: (NaiveDate::from_ymd_opt(2020, 1, 1).unwrap(), NaiveDate::from_ymd_opt(2020, 1, 1).unwrap()),
+            date_range: (
+                NaiveDate::from_ymd_opt(2020, 1, 1).unwrap(),
+                NaiveDate::from_ymd_opt(2020, 1, 1).unwrap(),
+            ),
             commits_by_author: HashMap::new(),
             commits_by_hour: [0; 24],
             commits_by_weekday: [0; 7],
@@ -236,10 +237,16 @@ impl GitInfographicsGenerator {
         // Aggregate stats
         for commit in &all_commits {
             // Author stats
-            *stats.commits_by_author.entry(commit.author.clone()).or_insert(0) += 1;
+            *stats
+                .commits_by_author
+                .entry(commit.author.clone())
+                .or_insert(0) += 1;
 
             // Lines of code
-            let entry = stats.lines_by_author.entry(commit.author.clone()).or_insert((0, 0));
+            let entry = stats
+                .lines_by_author
+                .entry(commit.author.clone())
+                .or_insert((0, 0));
             entry.0 += commit.insertions;
             entry.1 += commit.deletions;
 
@@ -308,7 +315,9 @@ impl GitInfographicsGenerator {
                 if let Some(ref mut commit) = current_commit {
                     let parts: Vec<&str> = line.split_whitespace().collect();
                     if parts.len() >= 2 {
-                        if let (Ok(ins), Ok(del)) = (parts[0].parse::<usize>(), parts[1].parse::<usize>()) {
+                        if let (Ok(ins), Ok(del)) =
+                            (parts[0].parse::<usize>(), parts[1].parse::<usize>())
+                        {
                             commit.insertions += ins;
                             commit.deletions += del;
                             commit.files_changed += 1;
@@ -444,25 +453,31 @@ impl GitInfographicsGenerator {
         let max_commits = stats.commits_by_date.values().max().copied().unwrap_or(1);
 
         let mut chart = ChartBuilder::on(&root)
-            .caption(format!("Git Activity Heatmap ({} - {})", start_date, end_date),
-                    ("sans-serif", 40).into_font())
+            .caption(
+                format!("Git Activity Heatmap ({} - {})", start_date, end_date),
+                ("sans-serif", 40).into_font(),
+            )
             .margin(20)
             .x_label_area_size(40)
             .y_label_area_size(60)
             .build_cartesian_2d(0..weeks, 0..7)?;
 
-        chart.configure_mesh()
+        chart
+            .configure_mesh()
             .y_labels(7)
-            .y_label_formatter(&|y| match y {
-                0 => "Mon",
-                1 => "Tue",
-                2 => "Wed",
-                3 => "Thu",
-                4 => "Fri",
-                5 => "Sat",
-                6 => "Sun",
-                _ => "",
-            }.to_string())
+            .y_label_formatter(&|y| {
+                match y {
+                    0 => "Mon",
+                    1 => "Tue",
+                    2 => "Wed",
+                    3 => "Thu",
+                    4 => "Fri",
+                    5 => "Sat",
+                    6 => "Sun",
+                    _ => "",
+                }
+                .to_string()
+            })
             .draw()?;
 
         // Draw heatmap squares
@@ -473,7 +488,11 @@ impl GitInfographicsGenerator {
                     break;
                 }
 
-                let commits = stats.commits_by_date.get(&current_date).copied().unwrap_or(0);
+                let commits = stats
+                    .commits_by_date
+                    .get(&current_date)
+                    .copied()
+                    .unwrap_or(0);
                 let intensity = (commits as f64 / max_commits as f64 * 255.0) as u8;
                 let color = RGBColor(255 - intensity, 255, 255 - intensity);
 
@@ -509,13 +528,17 @@ impl GitInfographicsGenerator {
         let max_commits = *top_15.first().unwrap().1;
 
         let mut chart = ChartBuilder::on(&root)
-            .caption("Top Contributors by Commit Count", ("sans-serif", 40).into_font())
+            .caption(
+                "Top Contributors by Commit Count",
+                ("sans-serif", 40).into_font(),
+            )
             .margin(20)
             .x_label_area_size(150)
             .y_label_area_size(60)
             .build_cartesian_2d(0..(top_15.len() as i32), 0..max_commits)?;
 
-        chart.configure_mesh()
+        chart
+            .configure_mesh()
             .x_labels(top_15.len())
             .x_label_formatter(&|x: &i32| {
                 let idx = *x as usize;
@@ -527,20 +550,14 @@ impl GitInfographicsGenerator {
             })
             .draw()?;
 
-        chart.draw_series(
-            top_15.iter().enumerate().map(|(i, (_, &commits))| {
-                let color = Palette99::pick(i).mix(0.9);
-                Rectangle::new([
-                    (i as i32, 0),
-                    (i as i32, commits),
-                ], color.filled())
-            }),
-        )?;
+        chart.draw_series(top_15.iter().enumerate().map(|(i, (_, &commits))| {
+            let color = Palette99::pick(i).mix(0.9);
+            Rectangle::new([(i as i32, 0), (i as i32, commits)], color.filled())
+        }))?;
 
         root.present()?;
         Ok(path_clone)
     }
-
 
     /// Generate activity timeline (commits over time)
     fn generate_activity_timeline(&self, stats: &GitStats) -> Result<PathBuf> {
@@ -566,13 +583,17 @@ impl GitInfographicsGenerator {
         let max_commits = monthly_commits.values().max().copied().unwrap_or(1);
 
         let mut chart = ChartBuilder::on(&root)
-            .caption("Commit Activity Over Time (Monthly)", ("sans-serif", 40).into_font())
+            .caption(
+                "Commit Activity Over Time (Monthly)",
+                ("sans-serif", 40).into_font(),
+            )
             .margin(20)
             .x_label_area_size(60)
             .y_label_area_size(60)
             .build_cartesian_2d(0..months.len(), 0..max_commits)?;
 
-        chart.configure_mesh()
+        chart
+            .configure_mesh()
             .x_label_formatter(&|x| {
                 let idx = *x;
                 if idx < months.len() {
@@ -585,16 +606,18 @@ impl GitInfographicsGenerator {
             .draw()?;
 
         chart.draw_series(LineSeries::new(
-            months.iter().enumerate().map(|(i, &&key)| {
-                (i, monthly_commits[&key])
-            }),
+            months
+                .iter()
+                .enumerate()
+                .map(|(i, &&key)| (i, monthly_commits[&key])),
             &RED,
         ))?;
 
         chart.draw_series(PointSeries::of_element(
-            months.iter().enumerate().map(|(i, &&key)| {
-                (i, monthly_commits[&key])
-            }),
+            months
+                .iter()
+                .enumerate()
+                .map(|(i, &&key)| (i, monthly_commits[&key])),
             5,
             &RED,
             &|c, s, st| {
@@ -622,20 +645,25 @@ impl GitInfographicsGenerator {
             .y_label_area_size(60)
             .build_cartesian_2d(0..24, 0..max_commits)?;
 
-        chart.configure_mesh()
+        chart
+            .configure_mesh()
             .x_labels(24)
             .x_label_formatter(&|x| format!("{}h", x))
             .draw()?;
 
         chart.draw_series(
-            stats.commits_by_hour.iter().enumerate().map(|(hour, &commits)| {
-                let intensity = (commits as f64 / max_commits as f64 * 255.0) as u8;
-                let color = RGBColor(intensity, 100, 255 - intensity);
-                Rectangle::new([
-                    (hour as i32, 0),
-                    (hour as i32 + 1, commits),
-                ], color.filled())
-            }),
+            stats
+                .commits_by_hour
+                .iter()
+                .enumerate()
+                .map(|(hour, &commits)| {
+                    let intensity = (commits as f64 / max_commits as f64 * 255.0) as u8;
+                    let color = RGBColor(intensity, 100, 255 - intensity);
+                    Rectangle::new(
+                        [(hour as i32, 0), (hour as i32 + 1, commits)],
+                        color.filled(),
+                    )
+                }),
         )?;
 
         root.present()?;
@@ -659,7 +687,8 @@ impl GitInfographicsGenerator {
             .y_label_area_size(60)
             .build_cartesian_2d(0..7, 0..max_commits)?;
 
-        chart.configure_mesh()
+        chart
+            .configure_mesh()
             .x_labels(7)
             .x_label_formatter(&|x: &i32| {
                 let idx = (*x as usize).min(6);
@@ -668,19 +697,23 @@ impl GitInfographicsGenerator {
             .draw()?;
 
         chart.draw_series(
-            stats.commits_by_weekday.iter().enumerate().map(|(day, &commits)| {
-                let color = if day < 5 { BLUE.mix(0.7) } else { GREEN.mix(0.7) };
-                Rectangle::new([
-                    (day as i32, 0),
-                    (day as i32 + 1, commits),
-                ], color.filled())
-            }),
+            stats
+                .commits_by_weekday
+                .iter()
+                .enumerate()
+                .map(|(day, &commits)| {
+                    let color = if day < 5 {
+                        BLUE.mix(0.7)
+                    } else {
+                        GREEN.mix(0.7)
+                    };
+                    Rectangle::new([(day as i32, 0), (day as i32 + 1, commits)], color.filled())
+                }),
         )?;
 
         root.present()?;
         Ok(path_clone)
     }
-
 
     /// Generate commit message quality histogram
     fn generate_message_quality(&self, stats: &GitStats) -> Result<PathBuf> {
@@ -699,13 +732,17 @@ impl GitInfographicsGenerator {
         let max_count = *buckets.iter().max().unwrap_or(&1);
 
         let mut chart = ChartBuilder::on(&root)
-            .caption("Commit Message Length Distribution", ("sans-serif", 40).into_font())
+            .caption(
+                "Commit Message Length Distribution",
+                ("sans-serif", 40).into_font(),
+            )
             .margin(20)
             .x_label_area_size(40)
             .y_label_area_size(60)
             .build_cartesian_2d(0..10, 0..max_count)?;
 
-        chart.configure_mesh()
+        chart
+            .configure_mesh()
             .x_labels(10)
             .x_label_formatter(&|x| {
                 if *x == 9 {
@@ -716,27 +753,21 @@ impl GitInfographicsGenerator {
             })
             .draw()?;
 
-        chart.draw_series(
-            buckets.iter().enumerate().map(|(i, &count)| {
-                // Color code: red for too short, green for optimal (50-72), yellow otherwise
-                let color = if i < 5 {
-                    RED.mix(0.7) // Too short
-                } else if i >= 5 && i <= 7 {
-                    GREEN.mix(0.7) // Optimal
-                } else {
-                    YELLOW.mix(0.7) // Too long
-                };
-                Rectangle::new([
-                    (i as i32, 0),
-                    (i as i32 + 1, count),
-                ], color.filled())
-            }),
-        )?;
+        chart.draw_series(buckets.iter().enumerate().map(|(i, &count)| {
+            // Color code: red for too short, green for optimal (50-72), yellow otherwise
+            let color = if i < 5 {
+                RED.mix(0.7) // Too short
+            } else if i >= 5 && i <= 7 {
+                GREEN.mix(0.7) // Optimal
+            } else {
+                YELLOW.mix(0.7) // Too long
+            };
+            Rectangle::new([(i as i32, 0), (i as i32 + 1, count)], color.filled())
+        }))?;
 
         root.present()?;
         Ok(path_clone)
     }
-
 
     /// Generate code contribution chart (lines added/deleted by top contributors)
     fn generate_code_contribution(&self, stats: &GitStats) -> Result<PathBuf> {
@@ -746,9 +777,11 @@ impl GitInfographicsGenerator {
         root.fill(&WHITE)?;
 
         // Get top 10 by total lines changed
-        let mut sorted: Vec<_> = stats.lines_by_author.iter().map(|(author, (add, del))| {
-            (author.clone(), add + del)
-        }).collect();
+        let mut sorted: Vec<_> = stats
+            .lines_by_author
+            .iter()
+            .map(|(author, (add, del))| (author.clone(), add + del))
+            .collect();
         sorted.sort_by(|a, b| b.1.cmp(&a.1));
         let top_10: Vec<_> = sorted.into_iter().take(10).map(|(a, _)| a).collect();
 
@@ -756,7 +789,8 @@ impl GitInfographicsGenerator {
             return Ok(path_clone);
         }
 
-        let max_lines = top_10.iter()
+        let max_lines = top_10
+            .iter()
             .map(|author| {
                 let (add, del) = stats.lines_by_author.get(author).unwrap_or(&(0, 0));
                 add + del
@@ -765,13 +799,17 @@ impl GitInfographicsGenerator {
             .unwrap_or(1);
 
         let mut chart = ChartBuilder::on(&root)
-            .caption("Code Contribution (Lines Changed)", ("sans-serif", 40).into_font())
+            .caption(
+                "Code Contribution (Lines Changed)",
+                ("sans-serif", 40).into_font(),
+            )
             .margin(20)
             .x_label_area_size(150)
             .y_label_area_size(80)
             .build_cartesian_2d(0..(top_10.len() as i32 * 2), 0..max_lines)?;
 
-        chart.configure_mesh()
+        chart
+            .configure_mesh()
             .x_labels(top_10.len())
             .x_label_formatter(&|x: &i32| {
                 let idx = (*x / 2) as usize;
@@ -790,16 +828,16 @@ impl GitInfographicsGenerator {
             let base_x = (i * 2) as i32;
 
             // Additions (green)
-            chart.draw_series(std::iter::once(Rectangle::new([
-                (base_x, 0),
-                (base_x + 1, *additions),
-            ], GREEN.mix(0.6).filled())))?;
+            chart.draw_series(std::iter::once(Rectangle::new(
+                [(base_x, 0), (base_x + 1, *additions)],
+                GREEN.mix(0.6).filled(),
+            )))?;
 
             // Deletions (red)
-            chart.draw_series(std::iter::once(Rectangle::new([
-                (base_x + 1, 0),
-                (base_x + 2, *deletions),
-            ], RED.mix(0.6).filled())))?;
+            chart.draw_series(std::iter::once(Rectangle::new(
+                [(base_x + 1, 0), (base_x + 2, *deletions)],
+                RED.mix(0.6).filled(),
+            )))?;
         }
 
         root.present()?;

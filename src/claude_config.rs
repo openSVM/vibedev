@@ -29,7 +29,10 @@ impl ClaudeProvider {
             "chatgpt" | "openai" => Ok(ClaudeProvider::ChatGPT),
             "litellm" => Ok(ClaudeProvider::LiteLLM),
             "custom" => Ok(ClaudeProvider::Custom),
-            _ => Err(anyhow!("Unknown provider: {}. Supported: z.ai, openrouter, chatgpt, litellm, custom", s)),
+            _ => Err(anyhow!(
+                "Unknown provider: {}. Supported: z.ai, openrouter, chatgpt, litellm, custom",
+                s
+            )),
         }
     }
 
@@ -104,7 +107,9 @@ impl ClaudeConfig {
     pub fn load() -> Result<Self> {
         let config_path = Self::config_file_path();
         if !config_path.exists() {
-            return Err(anyhow!("No Claude configuration found. Use 'vibedev claude set' to configure a provider."));
+            return Err(anyhow!(
+                "No Claude configuration found. Use 'vibedev claude set' to configure a provider."
+            ));
         }
 
         let content = fs::read_to_string(&config_path)?;
@@ -115,7 +120,7 @@ impl ClaudeConfig {
     /// Save configuration to file
     pub fn save(&self) -> Result<()> {
         let config_path = Self::config_file_path();
-        
+
         // Create parent directory if it doesn't exist
         if let Some(parent) = config_path.parent() {
             fs::create_dir_all(parent)?;
@@ -139,14 +144,14 @@ impl ClaudeConfig {
     pub fn write_claude_code_config(&self) -> Result<()> {
         // Claude Code stores its config in different locations based on OS
         let claude_config_paths = Self::get_claude_code_config_paths();
-        
+
         let mut wrote_any = false;
         for path in claude_config_paths {
             if let Some(parent) = path.parent() {
                 if parent.exists() || self.try_create_claude_dir(parent) {
                     // Create a simple config structure for Claude Code
                     let config_content = self.generate_claude_code_config();
-                    
+
                     match fs::write(&path, config_content) {
                         Ok(_) => {
                             println!("✓ Updated Claude Code config: {}", path.display());
@@ -174,17 +179,17 @@ impl ClaudeConfig {
     /// Get potential Claude Code config file paths
     fn get_claude_code_config_paths() -> Vec<PathBuf> {
         let mut paths = Vec::new();
-        
+
         if let Some(home) = dirs::home_dir() {
             // Linux/macOS
             paths.push(home.join(".claude").join("config.json"));
             paths.push(home.join(".config/claude/config.json"));
-            
+
             // macOS specific
             if cfg!(target_os = "macos") {
                 paths.push(home.join("Library/Application Support/Claude/config.json"));
             }
-            
+
             // Windows specific
             if cfg!(target_os = "windows") {
                 if let Some(appdata) = std::env::var_os("APPDATA") {
@@ -192,7 +197,7 @@ impl ClaudeConfig {
                 }
             }
         }
-        
+
         paths
     }
 
@@ -207,14 +212,14 @@ impl ClaudeConfig {
             model: &'a str,
             provider: &'a str,
         }
-        
+
         let config = ClaudeCodeConfig {
             api_url: &self.endpoint,
             api_key: &self.api_key,
             model: &self.model,
             provider: self.provider.name(),
         };
-        
+
         serde_json::to_string(&config).unwrap_or_default()
     }
 }
@@ -222,32 +227,47 @@ impl ClaudeConfig {
 /// List all supported providers
 pub fn list_providers() {
     use colored::Colorize;
-    
+
     println!("\n{}", "Supported Claude Code Providers:".cyan().bold());
     println!();
-    
+
     let providers = vec![
-        (ClaudeProvider::ZAi, "Z.ai - High-performance Claude API proxy"),
-        (ClaudeProvider::OpenRouter, "OpenRouter - Unified LLM API with multiple models"),
-        (ClaudeProvider::ChatGPT, "OpenAI ChatGPT - GPT-4 and other OpenAI models"),
-        (ClaudeProvider::LiteLLM, "LiteLLM - Local proxy for multiple providers"),
+        (
+            ClaudeProvider::ZAi,
+            "Z.ai - High-performance Claude API proxy",
+        ),
+        (
+            ClaudeProvider::OpenRouter,
+            "OpenRouter - Unified LLM API with multiple models",
+        ),
+        (
+            ClaudeProvider::ChatGPT,
+            "OpenAI ChatGPT - GPT-4 and other OpenAI models",
+        ),
+        (
+            ClaudeProvider::LiteLLM,
+            "LiteLLM - Local proxy for multiple providers",
+        ),
     ];
-    
+
     for (provider, description) in providers {
         println!("  {} - {}", provider.name().green(), description);
         println!("    Endpoint: {}", provider.default_endpoint());
         println!("    Model: {}", provider.default_model());
         println!();
     }
-    
-    println!("  {} - Custom provider with your own endpoint", "custom".green());
+
+    println!(
+        "  {} - Custom provider with your own endpoint",
+        "custom".green()
+    );
     println!();
 }
 
 /// Display current configuration
 pub fn show_current_config() -> Result<()> {
     use colored::Colorize;
-    
+
     match ClaudeConfig::load() {
         Ok(config) => {
             println!("\n{}", "Current Claude Code Configuration:".cyan().bold());
@@ -256,7 +276,10 @@ pub fn show_current_config() -> Result<()> {
             println!("  Endpoint: {}", config.endpoint);
             println!("  Model: {}", config.model);
             if config.api_key.len() > 4 {
-                println!("  API Key: ****{}", &config.api_key[config.api_key.len() - 4..]);
+                println!(
+                    "  API Key: ****{}",
+                    &config.api_key[config.api_key.len() - 4..]
+                );
             } else {
                 println!("  API Key: ****");
             }
@@ -264,7 +287,10 @@ pub fn show_current_config() -> Result<()> {
                 println!("  Organization ID: {}", org_id);
             }
             println!();
-            println!("  Config file: {}", ClaudeConfig::config_file_path().display());
+            println!(
+                "  Config file: {}",
+                ClaudeConfig::config_file_path().display()
+            );
             Ok(())
         }
         Err(_) => {
@@ -282,21 +308,51 @@ mod tests {
 
     #[test]
     fn test_provider_from_str() {
-        assert_eq!(ClaudeProvider::from_str("z.ai").unwrap(), ClaudeProvider::ZAi);
-        assert_eq!(ClaudeProvider::from_str("zai").unwrap(), ClaudeProvider::ZAi);
-        assert_eq!(ClaudeProvider::from_str("openrouter").unwrap(), ClaudeProvider::OpenRouter);
-        assert_eq!(ClaudeProvider::from_str("chatgpt").unwrap(), ClaudeProvider::ChatGPT);
-        assert_eq!(ClaudeProvider::from_str("openai").unwrap(), ClaudeProvider::ChatGPT);
-        assert_eq!(ClaudeProvider::from_str("litellm").unwrap(), ClaudeProvider::LiteLLM);
+        assert_eq!(
+            ClaudeProvider::from_str("z.ai").unwrap(),
+            ClaudeProvider::ZAi
+        );
+        assert_eq!(
+            ClaudeProvider::from_str("zai").unwrap(),
+            ClaudeProvider::ZAi
+        );
+        assert_eq!(
+            ClaudeProvider::from_str("openrouter").unwrap(),
+            ClaudeProvider::OpenRouter
+        );
+        assert_eq!(
+            ClaudeProvider::from_str("chatgpt").unwrap(),
+            ClaudeProvider::ChatGPT
+        );
+        assert_eq!(
+            ClaudeProvider::from_str("openai").unwrap(),
+            ClaudeProvider::ChatGPT
+        );
+        assert_eq!(
+            ClaudeProvider::from_str("litellm").unwrap(),
+            ClaudeProvider::LiteLLM
+        );
         assert!(ClaudeProvider::from_str("unknown").is_err());
     }
 
     #[test]
     fn test_provider_endpoints() {
-        assert_eq!(ClaudeProvider::ZAi.default_endpoint(), "https://api.z.ai/v1");
-        assert_eq!(ClaudeProvider::OpenRouter.default_endpoint(), "https://openrouter.ai/api/v1");
-        assert_eq!(ClaudeProvider::ChatGPT.default_endpoint(), "https://api.openai.com/v1");
-        assert_eq!(ClaudeProvider::LiteLLM.default_endpoint(), "http://localhost:4000");
+        assert_eq!(
+            ClaudeProvider::ZAi.default_endpoint(),
+            "https://api.z.ai/v1"
+        );
+        assert_eq!(
+            ClaudeProvider::OpenRouter.default_endpoint(),
+            "https://openrouter.ai/api/v1"
+        );
+        assert_eq!(
+            ClaudeProvider::ChatGPT.default_endpoint(),
+            "https://api.openai.com/v1"
+        );
+        assert_eq!(
+            ClaudeProvider::LiteLLM.default_endpoint(),
+            "http://localhost:4000"
+        );
     }
 
     #[test]

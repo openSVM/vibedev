@@ -54,7 +54,11 @@ impl TimelinePngRenderer {
         Ok(())
     }
 
-    fn draw_stats(&self, area: &DrawingArea<BitMapBackend, plotters::coord::Shift>, timeline: &Timeline) -> Result<()> {
+    fn draw_stats(
+        &self,
+        area: &DrawingArea<BitMapBackend, plotters::coord::Shift>,
+        timeline: &Timeline,
+    ) -> Result<()> {
         area.fill(&RGBColor(250, 250, 250))?;
 
         let stats = &timeline.stats;
@@ -92,7 +96,11 @@ impl TimelinePngRenderer {
         Ok(())
     }
 
-    fn draw_timeline(&self, area: &DrawingArea<BitMapBackend, plotters::coord::Shift>, timeline: &Timeline) -> Result<()> {
+    fn draw_timeline(
+        &self,
+        area: &DrawingArea<BitMapBackend, plotters::coord::Shift>,
+        timeline: &Timeline,
+    ) -> Result<()> {
         if timeline.sessions.is_empty() {
             area.draw_text(
                 "No sessions found",
@@ -121,7 +129,13 @@ impl TimelinePngRenderer {
 
         // Draw border
         area.draw(&Rectangle::new(
-            [(margin_left as i32, margin_top as i32), ((WIDTH - margin_right) as i32, (HEIGHT - 260 - margin_bottom) as i32)],
+            [
+                (margin_left as i32, margin_top as i32),
+                (
+                    (WIDTH - margin_right) as i32,
+                    (HEIGHT - 260 - margin_bottom) as i32,
+                ),
+            ],
             ShapeStyle::from(RGBColor(200, 200, 200)).stroke_width(2),
         ))?;
 
@@ -136,7 +150,10 @@ impl TimelinePngRenderer {
 
             // Draw vertical grid line
             area.draw(&PathElement::new(
-                vec![(x, margin_top as i32), (x, (HEIGHT - 260 - margin_bottom) as i32)],
+                vec![
+                    (x, margin_top as i32),
+                    (x, (HEIGHT - 260 - margin_bottom) as i32),
+                ],
                 ShapeStyle::from(RGBColor(230, 230, 230)).stroke_width(1),
             ))?;
 
@@ -144,8 +161,7 @@ impl TimelinePngRenderer {
             let label = format!("{}/{}", dt.month(), dt.day());
             area.draw_text(
                 &label,
-                &TextStyle::from(("sans-serif", 14).into_font())
-                    .color(&RGBColor(100, 100, 100)),
+                &TextStyle::from(("sans-serif", 14).into_font()).color(&RGBColor(100, 100, 100)),
                 (x, (HEIGHT - 260 - margin_bottom + 10) as i32),
             )?;
         }
@@ -154,7 +170,10 @@ impl TimelinePngRenderer {
         let num_sessions = timeline.sessions.len().min(500); // Cap at 500 for readability
         let sessions_to_show: Vec<_> = if timeline.sessions.len() > 500 {
             // Show first 250 and last 250
-            timeline.sessions.iter().take(250)
+            timeline
+                .sessions
+                .iter()
+                .take(250)
                 .chain(timeline.sessions.iter().skip(timeline.sessions.len() - 250))
                 .cloned()
                 .collect()
@@ -169,8 +188,12 @@ impl TimelinePngRenderer {
             let session_start = session.start.timestamp();
             let session_end = session.end.timestamp();
 
-            let x1 = margin_left as i32 + ((session_start - start_time) * chart_width as i64 / (end_time - start_time)) as i32;
-            let x2 = margin_left as i32 + ((session_end - start_time) * chart_width as i64 / (end_time - start_time)) as i32;
+            let x1 = margin_left as i32
+                + ((session_start - start_time) * chart_width as i64 / (end_time - start_time))
+                    as i32;
+            let x2 = margin_left as i32
+                + ((session_end - start_time) * chart_width as i64 / (end_time - start_time))
+                    as i32;
 
             let y = margin_top as i32 + (idx as i32 * bar_height) + 5;
 
@@ -196,8 +219,7 @@ impl TimelinePngRenderer {
                 let label = format!("{} ({:.1}h)", session.project, session.hours);
                 area.draw_text(
                     &label,
-                    &TextStyle::from(("sans-serif", 12).into_font())
-                        .color(&RGBColor(60, 60, 60)),
+                    &TextStyle::from(("sans-serif", 12).into_font()).color(&RGBColor(60, 60, 60)),
                     (x1 - 5, y - 2),
                 )?;
             }
@@ -224,8 +246,7 @@ impl TimelinePngRenderer {
 
             area.draw_text(
                 label,
-                &TextStyle::from(("sans-serif", 16).into_font())
-                    .color(&RGBColor(60, 60, 60)),
+                &TextStyle::from(("sans-serif", 16).into_font()).color(&RGBColor(60, 60, 60)),
                 (x + 30, legend_y + 12),
             )?;
         }

@@ -1,7 +1,6 @@
 // Workflow Correlation - Tracks user journey: Shell → Claude → Commit
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
-use anyhow::Result;
 
 use crate::ai_impact_analyzer::{ClaudeConversation, GitCommitInfo};
 use crate::shell_analytics::StruggleSession;
@@ -27,20 +26,20 @@ pub struct WorkflowPattern {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum PatternType {
-    ShellErrorToClaudeHelp,       // Failed commands → AI assistance
-    ClaudeHelpToCommit,           // AI help → successful commit
-    FullCycle,                    // Struggle → Claude → Commit
-    GitConflictResolution,        // Git conflict → Claude → resolved
-    BuildFailureRecovery,         // Build error → Claude → fixed
-    QuickFix,                     // Claude → immediate commit
+    ShellErrorToClaudeHelp, // Failed commands → AI assistance
+    ClaudeHelpToCommit,     // AI help → successful commit
+    FullCycle,              // Struggle → Claude → Commit
+    GitConflictResolution,  // Git conflict → Claude → resolved
+    BuildFailureRecovery,   // Build error → Claude → fixed
+    QuickFix,               // Claude → immediate commit
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkflowExample {
     pub timestamp: DateTime<Utc>,
-    pub trigger: String,          // What started it (error, question, etc.)
+    pub trigger: String, // What started it (error, question, etc.)
     pub ai_intervention: bool,
-    pub outcome: String,          // Success, partial, failed
+    pub outcome: String, // Success, partial, failed
     pub duration_minutes: f64,
 }
 
@@ -115,12 +114,14 @@ impl WorkflowAnalyzer {
             0.0
         };
 
-        let struggle_to_ai_count = patterns.iter()
+        let struggle_to_ai_count = patterns
+            .iter()
             .filter(|p| matches!(p.pattern_type, PatternType::ShellErrorToClaudeHelp))
             .map(|p| p.occurrences)
             .sum();
 
-        let ai_to_commit_count = patterns.iter()
+        let ai_to_commit_count = patterns
+            .iter()
             .filter(|p| matches!(p.pattern_type, PatternType::ClaudeHelpToCommit))
             .map(|p| p.occurrences)
             .sum();
@@ -144,7 +145,8 @@ impl WorkflowAnalyzer {
                 if conversation.start > struggle.timestamp
                     && conversation.start < struggle.timestamp + self.correlation_window
                 {
-                    let duration = conversation.start
+                    let duration = conversation
+                        .start
                         .signed_duration_since(struggle.timestamp)
                         .num_minutes() as f64;
 
@@ -171,9 +173,9 @@ impl WorkflowAnalyzer {
             0.0
         };
 
-        let success_rate = examples.iter()
-            .filter(|e| e.outcome == "Resolved")
-            .count() as f64 / examples.len().max(1) as f64 * 100.0;
+        let success_rate = examples.iter().filter(|e| e.outcome == "Resolved").count() as f64
+            / examples.len().max(1) as f64
+            * 100.0;
 
         WorkflowPattern {
             pattern_type: PatternType::ShellErrorToClaudeHelp,
@@ -193,7 +195,8 @@ impl WorkflowAnalyzer {
                 if commit.timestamp > conversation.end
                     && commit.timestamp < conversation.end + self.correlation_window
                 {
-                    let duration = commit.timestamp
+                    let duration = commit
+                        .timestamp
                         .signed_duration_since(conversation.start)
                         .num_minutes() as f64;
 
@@ -239,7 +242,8 @@ impl WorkflowAnalyzer {
                     c.timestamp > conversation.end
                         && c.timestamp < conversation.end + self.correlation_window
                 }) {
-                    let total_duration = commit.timestamp
+                    let total_duration = commit
+                        .timestamp
                         .signed_duration_since(struggle.timestamp)
                         .num_minutes() as f64;
 
@@ -274,13 +278,17 @@ impl WorkflowAnalyzer {
 
         for struggle in &self.struggle_sessions {
             // Check if it's a git conflict struggle
-            if matches!(struggle.struggle_type, crate::shell_analytics::StruggleType::GitConflicts) {
+            if matches!(
+                struggle.struggle_type,
+                crate::shell_analytics::StruggleType::GitConflicts
+            ) {
                 // Look for Claude help
                 if let Some(conversation) = self.claude_conversations.iter().find(|c| {
                     c.start > struggle.timestamp
                         && c.start < struggle.timestamp + self.correlation_window
                 }) {
-                    let duration = conversation.start
+                    let duration = conversation
+                        .start
                         .signed_duration_since(struggle.timestamp)
                         .num_minutes() as f64;
 
@@ -314,12 +322,16 @@ impl WorkflowAnalyzer {
         let mut examples = Vec::new();
 
         for struggle in &self.struggle_sessions {
-            if matches!(struggle.struggle_type, crate::shell_analytics::StruggleType::BuildFailures) {
+            if matches!(
+                struggle.struggle_type,
+                crate::shell_analytics::StruggleType::BuildFailures
+            ) {
                 if let Some(conversation) = self.claude_conversations.iter().find(|c| {
                     c.start > struggle.timestamp
                         && c.start < struggle.timestamp + self.correlation_window
                 }) {
-                    let duration = conversation.start
+                    let duration = conversation
+                        .start
                         .signed_duration_since(struggle.timestamp)
                         .num_minutes() as f64;
 
@@ -358,7 +370,8 @@ impl WorkflowAnalyzer {
                 c.timestamp > conversation.end
                     && c.timestamp < conversation.end + Duration::minutes(15)
             }) {
-                let duration = commit.timestamp
+                let duration = commit
+                    .timestamp
                     .signed_duration_since(conversation.start)
                     .num_minutes() as f64;
 
