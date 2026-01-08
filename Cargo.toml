@@ -61,7 +61,7 @@ ratatui = "0.29"
 crossterm = "0.28"
 
 # LLM integration (Ollama, OpenAI, Anthropic)
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 futures = "0.3"
 
 # Embedded LLM with optional GPU + Quantization support
