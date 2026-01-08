@@ -1660,6 +1660,923 @@ pub fn format_duration_human(seconds: u64) -> String {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════
+// ADDITIONAL VISUALIZATIONS - Part 2
+// ═══════════════════════════════════════════════════════════════
+
+/// Gauge - Semicircular gauge visualization
+pub struct Gauge {
+    pub label: String,
+    pub value: f64,
+    pub min: f64,
+    pub max: f64,
+    pub thresholds: Vec<(f64, &'static str)>, // (threshold, color)
+}
+
+impl Gauge {
+    pub fn new(label: &str, value: f64, min: f64, max: f64) -> Self {
+        Self {
+            label: label.to_string(),
+            value,
+            min,
+            max,
+            thresholds: vec![
+                (0.25, "red"),
+                (0.5, "yellow"),
+                (0.75, "cyan"),
+                (1.0, "green"),
+            ],
+        }
+    }
+
+    pub fn with_thresholds(mut self, thresholds: Vec<(f64, &'static str)>) -> Self {
+        self.thresholds = thresholds;
+        self
+    }
+
+    pub fn render(&self) -> String {
+        let mut output = String::new();
+        let pct = ((self.value - self.min) / (self.max - self.min)).clamp(0.0, 1.0);
+
+        // Determine color based on thresholds
+        let color = self.thresholds
+            .iter()
+            .find(|(t, _)| pct <= *t)
+            .map(|(_, c)| *c)
+            .unwrap_or("white");
+
+        // ASCII gauge (20 segments)
+        let segments = 20;
+        let filled = (pct * segments as f64) as usize;
+
+        // Top arc
+        output.push_str(&format!("  {}\n", self.label.bold()));
+        output.push_str("       ╭──────────────────────╮\n");
+
+        // Gauge bar
+        output.push_str("      │");
+        for i in 0..segments {
+            let ch = if i < filled { "█" } else { "░" };
+            output.push_str(&colorize_text(ch, color).to_string());
+        }
+        output.push_str("│\n");
+
+        // Bottom with value
+        output.push_str("       ╰──────────────────────╯\n");
+
+        let value_str = format!("{:.1}", self.value);
+        let pct_str = format!("{:.0}%", pct * 100.0);
+        let padding = 11 - value_str.len() / 2;
+        output.push_str(&format!(
+            "{:>width$}{} ({})\n",
+            "",
+            colorize_text(&value_str, color),
+            pct_str.dimmed(),
+            width = padding
+        ));
+
+        output
+    }
+}
+
+/// Donut Chart - Circular percentage visualization
+pub struct DonutChart {
+    pub title: String,
+    pub segments: Vec<(String, f64, String)>, // (label, value, color)
+    pub size: usize, // 1=small, 2=medium, 3=large
+}
+
+impl DonutChart {
+    pub fn new(title: &str) -> Self {
+        Self {
+            title: title.to_string(),
+            segments: Vec::new(),
+            size: 2,
+        }
+    }
+
+    pub fn add(&mut self, label: &str, value: f64, color: &str) {
+        self.segments.push((label.to_string(), value, color.to_string()));
+    }
+
+    pub fn render(&self) -> String {
+        let mut output = String::new();
+        output.push_str(&format!("  {}\n\n", self.title.bold()));
+
+        if self.segments.is_empty() {
+            output.push_str("  No data\n");
+            return output;
+        }
+
+        let total: f64 = self.segments.iter().map(|(_, v, _)| v).sum();
+
+        // ASCII donut representation
+        let donut_chars = [
+            "    ╭───────╮    ",
+            "  ╭─┘       └─╮  ",
+            " │             │ ",
+            " │      ●      │ ",
+            " │             │ ",
+            "  ╰─╮       ╭─╯  ",
+            "    ╰───────╯    ",
+        ];
+
+        for line in &donut_chars {
+            output.push_str(&format!("  {}\n", line));
+        }
+
+        output.push('\n');
+
+        // Legend with percentages
+        for (label, value, color) in &self.segments {
+            let pct = if total > 0.0 { value / total * 100.0 } else { 0.0 };
+            let bullet = colorize_bullet(color);
+            output.push_str(&format!(
+                "  {} {} ({:.1}%) - {}\n",
+                bullet,
+                label,
+                pct,
+                format_number(*value)
+            ));
+        }
+
+        output
+    }
+}
+
+/// Bullet Chart - Progress with target and ranges
+pub struct BulletChart {
+    pub label: String,
+    pub value: f64,
+    pub target: f64,
+    pub ranges: Vec<(f64, &'static str)>, // (threshold %, color)
+    pub width: usize,
+}
+
+impl BulletChart {
+    pub fn new(label: &str, value: f64, target: f64) -> Self {
+        Self {
+            label: label.to_string(),
+            value,
+            target,
+            ranges: vec![
+                (0.33, "red"),
+                (0.66, "yellow"),
+                (1.0, "green"),
+            ],
+            width: 40,
+        }
+    }
+
+    pub fn render(&self) -> String {
+        let mut output = String::new();
+
+        let max_val = self.target * 1.2; // 120% of target
+        let value_pos = ((self.value / max_val) * self.width as f64) as usize;
+        let target_pos = ((self.target / max_val) * self.width as f64) as usize;
+
+        output.push_str(&format!("  {}\n", self.label));
+        output.push_str("  ");
+
+        // Draw background ranges
+        for i in 0..self.width {
+            let pos_pct = i as f64 / self.width as f64;
+            let range_color = self.ranges
+                .iter()
+                .find(|(t, _)| pos_pct <= *t)
+                .map(|(_, c)| *c)
+                .unwrap_or("white");
+
+            let ch = if i == target_pos {
+                "│" // Target marker
+            } else if i < value_pos {
+                "█" // Value bar
+            } else {
+                "░" // Background
+            };
+
+            if i < value_pos {
+                output.push_str(&colorize_text(ch, "white").to_string());
+            } else {
+                output.push_str(&colorize_text(ch, range_color).to_string());
+            }
+        }
+
+        output.push_str(&format!(
+            " {} (target: {})\n",
+            format_number(self.value),
+            format_number(self.target)
+        ));
+
+        output
+    }
+}
+
+/// Funnel Chart - Conversion funnel visualization
+pub struct FunnelChart {
+    pub title: String,
+    pub stages: Vec<(String, f64)>,
+}
+
+impl FunnelChart {
+    pub fn new(title: &str) -> Self {
+        Self {
+            title: title.to_string(),
+            stages: Vec::new(),
+        }
+    }
+
+    pub fn add(&mut self, label: &str, value: f64) {
+        self.stages.push((label.to_string(), value));
+    }
+
+    pub fn render(&self) -> String {
+        let mut output = String::new();
+        output.push_str(&format!("  {}\n\n", self.title.bold()));
+
+        if self.stages.is_empty() {
+            output.push_str("  No data\n");
+            return output;
+        }
+
+        let max_val = self.stages.first().map(|(_, v)| *v).unwrap_or(1.0);
+        let max_width = 40;
+
+        for (i, (label, value)) in self.stages.iter().enumerate() {
+            let width = ((value / max_val) * max_width as f64) as usize;
+            let padding = (max_width - width) / 2;
+
+            let bar = "█".repeat(width);
+            let color = match i {
+                0 => "cyan",
+                1 => "blue",
+                2 => "magenta",
+                3 => "yellow",
+                _ => "green",
+            };
+
+            // Calculate conversion rate from previous stage
+            let conv_rate = if i > 0 {
+                let prev_val = self.stages[i - 1].1;
+                if prev_val > 0.0 {
+                    format!(" ({:.1}%)", value / prev_val * 100.0)
+                } else {
+                    String::new()
+                }
+            } else {
+                String::new()
+            };
+
+            output.push_str(&format!("{:>width$}", "", width = padding + 2));
+            output.push_str(&colorize_text(&bar, color).to_string());
+            output.push('\n');
+
+            output.push_str(&format!(
+                "  {:>12} : {}{}\n",
+                label,
+                format_number(*value),
+                conv_rate.dimmed()
+            ));
+        }
+
+        output
+    }
+}
+
+/// Box Plot - Statistical distribution visualization
+pub struct BoxPlot {
+    pub label: String,
+    pub min: f64,
+    pub q1: f64,
+    pub median: f64,
+    pub q3: f64,
+    pub max: f64,
+    pub width: usize,
+}
+
+impl BoxPlot {
+    pub fn new(label: &str, data: &[f64]) -> Self {
+        let mut sorted: Vec<f64> = data.to_vec();
+        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+        let len = sorted.len();
+        let (min, max, median, q1, q3) = if len == 0 {
+            (0.0, 0.0, 0.0, 0.0, 0.0)
+        } else {
+            let min = sorted[0];
+            let max = sorted[len - 1];
+            let median = if len % 2 == 0 {
+                (sorted[len / 2 - 1] + sorted[len / 2]) / 2.0
+            } else {
+                sorted[len / 2]
+            };
+            let q1 = sorted[len / 4];
+            let q3 = sorted[3 * len / 4];
+            (min, max, median, q1, q3)
+        };
+
+        Self {
+            label: label.to_string(),
+            min,
+            q1,
+            median,
+            q3,
+            max,
+            width: 50,
+        }
+    }
+
+    pub fn from_stats(label: &str, min: f64, q1: f64, median: f64, q3: f64, max: f64) -> Self {
+        Self {
+            label: label.to_string(),
+            min,
+            q1,
+            median,
+            q3,
+            max,
+            width: 50,
+        }
+    }
+
+    pub fn render(&self) -> String {
+        let mut output = String::new();
+
+        let range = self.max - self.min;
+        if range <= 0.0 {
+            output.push_str(&format!("  {} [no variance]\n", self.label));
+            return output;
+        }
+
+        let scale = |v: f64| ((v - self.min) / range * self.width as f64) as usize;
+
+        let min_pos = 0;
+        let q1_pos = scale(self.q1);
+        let med_pos = scale(self.median);
+        let q3_pos = scale(self.q3);
+        let max_pos = self.width;
+
+        output.push_str(&format!("  {}\n  ", self.label));
+
+        for i in 0..=self.width {
+            let ch = if i == min_pos || i == max_pos {
+                "│"
+            } else if i == med_pos {
+                "┃"
+            } else if i > min_pos && i < q1_pos {
+                "─"
+            } else if i >= q1_pos && i <= q3_pos {
+                "█"
+            } else if i > q3_pos && i < max_pos {
+                "─"
+            } else {
+                " "
+            };
+
+            let colored = if i == med_pos {
+                ch.yellow().bold().to_string()
+            } else if i >= q1_pos && i <= q3_pos {
+                ch.cyan().to_string()
+            } else {
+                ch.dimmed().to_string()
+            };
+            output.push_str(&colored);
+        }
+
+        output.push_str(&format!(
+            "\n  {:<6} {:<6} {:<6} {:<6} {:>6}\n",
+            format_number(self.min),
+            format_number(self.q1),
+            format_number(self.median).yellow(),
+            format_number(self.q3),
+            format_number(self.max)
+        ));
+
+        output
+    }
+}
+
+/// Waterfall Chart - Cumulative increases and decreases
+pub struct WaterfallChart {
+    pub title: String,
+    pub items: Vec<(String, f64, bool)>, // (label, value, is_total)
+}
+
+impl WaterfallChart {
+    pub fn new(title: &str) -> Self {
+        Self {
+            title: title.to_string(),
+            items: Vec::new(),
+        }
+    }
+
+    pub fn add(&mut self, label: &str, value: f64) {
+        self.items.push((label.to_string(), value, false));
+    }
+
+    pub fn add_total(&mut self, label: &str) {
+        let sum: f64 = self.items.iter().map(|(_, v, _)| v).sum();
+        self.items.push((label.to_string(), sum, true));
+    }
+
+    pub fn render(&self) -> String {
+        let mut output = String::new();
+        output.push_str(&format!("  {}\n\n", self.title.bold()));
+
+        if self.items.is_empty() {
+            output.push_str("  No data\n");
+            return output;
+        }
+
+        let max_abs = self.items
+            .iter()
+            .map(|(_, v, _)| v.abs())
+            .fold(0.0f64, f64::max);
+
+        let bar_width = 30;
+        let mut running_total = 0.0f64;
+
+        for (label, value, is_total) in &self.items {
+            let display_val = if *is_total { *value } else { *value };
+            let bar_len = ((display_val.abs() / max_abs) * bar_width as f64) as usize;
+
+            let (bar, color) = if *is_total {
+                ("═".repeat(bar_len), "cyan")
+            } else if *value >= 0.0 {
+                ("█".repeat(bar_len), "green")
+            } else {
+                ("█".repeat(bar_len), "red")
+            };
+
+            let prefix = if *value >= 0.0 && !*is_total { "+" } else { "" };
+
+            output.push_str(&format!(
+                "  {:>12} │{} {}{}\n",
+                label,
+                colorize_text(&bar, color),
+                prefix,
+                format_number(display_val)
+            ));
+
+            if !*is_total {
+                running_total += value;
+            }
+        }
+
+        output
+    }
+}
+
+/// Radar Chart - Multi-axis comparison (simplified ASCII)
+pub struct RadarChart {
+    pub title: String,
+    pub axes: Vec<String>,
+    pub values: Vec<f64>, // 0.0 to 1.0 normalized
+}
+
+impl RadarChart {
+    pub fn new(title: &str) -> Self {
+        Self {
+            title: title.to_string(),
+            axes: Vec::new(),
+            values: Vec::new(),
+        }
+    }
+
+    pub fn add(&mut self, axis: &str, value: f64) {
+        self.axes.push(axis.to_string());
+        self.values.push(value.clamp(0.0, 1.0));
+    }
+
+    pub fn render(&self) -> String {
+        let mut output = String::new();
+        output.push_str(&format!("  {}\n\n", self.title.bold()));
+
+        if self.axes.is_empty() {
+            output.push_str("  No data\n");
+            return output;
+        }
+
+        // Simple horizontal bar representation for each axis
+        let max_label_len = self.axes.iter().map(|a| a.len()).max().unwrap_or(10);
+        let bar_width = 20;
+
+        for (axis, value) in self.axes.iter().zip(self.values.iter()) {
+            let filled = (*value * bar_width as f64) as usize;
+            let empty = bar_width - filled;
+
+            let bar = format!("{}{}", "█".repeat(filled), "░".repeat(empty));
+            let color = if *value >= 0.8 {
+                "green"
+            } else if *value >= 0.5 {
+                "cyan"
+            } else if *value >= 0.3 {
+                "yellow"
+            } else {
+                "red"
+            };
+
+            output.push_str(&format!(
+                "  {:>width$} │{} {:.0}%\n",
+                axis,
+                colorize_text(&bar, color),
+                value * 100.0,
+                width = max_label_len
+            ));
+        }
+
+        output
+    }
+}
+
+/// Matrix Heatmap - 2D data grid with color intensity
+pub struct MatrixHeatmap {
+    pub title: String,
+    pub row_labels: Vec<String>,
+    pub col_labels: Vec<String>,
+    pub data: Vec<Vec<f64>>,
+}
+
+impl MatrixHeatmap {
+    pub fn new(title: &str) -> Self {
+        Self {
+            title: title.to_string(),
+            row_labels: Vec::new(),
+            col_labels: Vec::new(),
+            data: Vec::new(),
+        }
+    }
+
+    pub fn set_labels(&mut self, rows: Vec<&str>, cols: Vec<&str>) {
+        self.row_labels = rows.into_iter().map(|s| s.to_string()).collect();
+        self.col_labels = cols.into_iter().map(|s| s.to_string()).collect();
+    }
+
+    pub fn set_data(&mut self, data: Vec<Vec<f64>>) {
+        self.data = data;
+    }
+
+    pub fn render(&self) -> String {
+        let mut output = String::new();
+        output.push_str(&format!("  {}\n\n", self.title.bold()));
+
+        if self.data.is_empty() {
+            output.push_str("  No data\n");
+            return output;
+        }
+
+        let max_val = self.data
+            .iter()
+            .flat_map(|row| row.iter())
+            .cloned()
+            .fold(0.0f64, f64::max);
+
+        let row_label_width = self.row_labels.iter().map(|l| l.len()).max().unwrap_or(3);
+
+        // Column headers
+        output.push_str(&format!("{:>width$} ", "", width = row_label_width + 2));
+        for col in &self.col_labels {
+            output.push_str(&format!("{:>3} ", &col[..col.len().min(3)]));
+        }
+        output.push('\n');
+
+        // Data rows
+        for (row_idx, row) in self.data.iter().enumerate() {
+            let row_label = self.row_labels.get(row_idx).map(|s| s.as_str()).unwrap_or("");
+            output.push_str(&format!("  {:>width$} ", row_label, width = row_label_width));
+
+            for val in row {
+                let intensity = if max_val > 0.0 { val / max_val } else { 0.0 };
+                let ch = if intensity >= 0.8 {
+                    "██"
+                } else if intensity >= 0.6 {
+                    "▓▓"
+                } else if intensity >= 0.4 {
+                    "▒▒"
+                } else if intensity >= 0.2 {
+                    "░░"
+                } else {
+                    "··"
+                };
+
+                let colored = if intensity >= 0.8 {
+                    ch.green().bold().to_string()
+                } else if intensity >= 0.6 {
+                    ch.green().to_string()
+                } else if intensity >= 0.4 {
+                    ch.yellow().to_string()
+                } else if intensity >= 0.2 {
+                    ch.cyan().to_string()
+                } else {
+                    ch.dimmed().to_string()
+                };
+                output.push_str(&format!("{} ", colored));
+            }
+            output.push('\n');
+        }
+
+        output
+    }
+}
+
+/// Gantt Chart - Timeline/schedule visualization
+pub struct GanttChart {
+    pub title: String,
+    pub tasks: Vec<(String, u32, u32, String)>, // (name, start, duration, color)
+    pub total_units: u32,
+    pub unit_label: String,
+}
+
+impl GanttChart {
+    pub fn new(title: &str, total_units: u32) -> Self {
+        Self {
+            title: title.to_string(),
+            tasks: Vec::new(),
+            total_units,
+            unit_label: "day".to_string(),
+        }
+    }
+
+    pub fn with_unit_label(mut self, label: &str) -> Self {
+        self.unit_label = label.to_string();
+        self
+    }
+
+    pub fn add(&mut self, name: &str, start: u32, duration: u32, color: &str) {
+        self.tasks.push((name.to_string(), start, duration, color.to_string()));
+    }
+
+    pub fn render(&self) -> String {
+        let mut output = String::new();
+        output.push_str(&format!("  {}\n\n", self.title.bold()));
+
+        if self.tasks.is_empty() {
+            output.push_str("  No tasks\n");
+            return output;
+        }
+
+        let max_name_len = self.tasks.iter().map(|(n, _, _, _)| n.len()).max().unwrap_or(10);
+        let chart_width = 40;
+        let scale = chart_width as f64 / self.total_units as f64;
+
+        // Header with time markers
+        let mut header = format!("{:>width$} │", "", width = max_name_len + 2);
+        let header_base_len = header.len();
+        for i in 0..=4 {
+            let mark = (self.total_units as f64 * i as f64 / 4.0) as u32;
+            let target_pos = header_base_len + (chart_width as f64 * i as f64 / 4.0) as usize;
+            let current_len = header.len();
+            if target_pos > current_len {
+                header.push_str(&" ".repeat(target_pos - current_len));
+            }
+            header.push_str(&format!("{}", mark));
+        }
+        output.push_str(&header);
+        output.push('\n');
+
+        // Task bars
+        for (name, start, duration, color) in &self.tasks {
+            let start_pos = (*start as f64 * scale) as usize;
+            let bar_len = (*duration as f64 * scale).max(1.0) as usize;
+
+            output.push_str(&format!("  {:>width$} │", name, width = max_name_len));
+            output.push_str(&" ".repeat(start_pos));
+
+            let bar = "█".repeat(bar_len);
+            output.push_str(&colorize_text(&bar, color).to_string());
+
+            output.push_str(&format!(" {}{}s\n", duration, self.unit_label));
+        }
+
+        output
+    }
+}
+
+/// Mini Dashboard - Composite widget with multiple metrics
+pub struct MiniDashboard {
+    pub title: String,
+    pub metrics: Vec<(String, String, Option<f64>)>, // (label, value, change%)
+    pub sparklines: Vec<(String, Vec<f64>)>,
+}
+
+impl MiniDashboard {
+    pub fn new(title: &str) -> Self {
+        Self {
+            title: title.to_string(),
+            metrics: Vec::new(),
+            sparklines: Vec::new(),
+        }
+    }
+
+    pub fn add_metric(&mut self, label: &str, value: &str, change: Option<f64>) {
+        self.metrics.push((label.to_string(), value.to_string(), change));
+    }
+
+    pub fn add_sparkline(&mut self, label: &str, data: Vec<f64>) {
+        self.sparklines.push((label.to_string(), data));
+    }
+
+    pub fn render(&self) -> String {
+        let mut output = String::new();
+
+        // Title bar
+        let width = 50;
+        output.push_str(&format!("  ╭{}╮\n", "─".repeat(width)));
+        let title_padding = (width - self.title.len()) / 2;
+        output.push_str(&format!(
+            "  │{:>width$}{}{}│\n",
+            "",
+            self.title.bold(),
+            " ".repeat(width - title_padding - self.title.len()),
+            width = title_padding
+        ));
+        output.push_str(&format!("  ├{}┤\n", "─".repeat(width)));
+
+        // Metrics in a grid
+        let metrics_per_row = 2;
+        for chunk in self.metrics.chunks(metrics_per_row) {
+            output.push_str("  │ ");
+            for (i, (label, value, change)) in chunk.iter().enumerate() {
+                let change_str = match change {
+                    Some(c) if *c > 0.0 => format!(" {}", format!("↑{:.0}%", c).green()),
+                    Some(c) if *c < 0.0 => format!(" {}", format!("↓{:.0}%", c.abs()).red()),
+                    _ => String::new(),
+                };
+
+                let cell = format!("{}: {}{}", label, value.cyan(), change_str);
+                let cell_width = width / metrics_per_row - 1;
+
+                if i > 0 {
+                    output.push_str("│ ");
+                }
+                output.push_str(&format!("{:width$}", cell, width = cell_width));
+            }
+            output.push_str("│\n");
+        }
+
+        // Sparklines
+        if !self.sparklines.is_empty() {
+            output.push_str(&format!("  ├{}┤\n", "─".repeat(width)));
+            for (label, data) in &self.sparklines {
+                let spark = Sparkline::new(data).with_width(width - label.len() - 4);
+                output.push_str(&format!(
+                    "  │ {}: {}│\n",
+                    label,
+                    spark.render_colored("cyan")
+                ));
+            }
+        }
+
+        output.push_str(&format!("  ╰{}╯\n", "─".repeat(width)));
+
+        output
+    }
+}
+
+/// ASCII Banner - Large text display
+pub struct AsciiBanner {
+    pub text: String,
+    pub style: BannerStyle,
+}
+
+#[derive(Clone, Copy)]
+pub enum BannerStyle {
+    Block,
+    Slim,
+    Shadow,
+}
+
+impl AsciiBanner {
+    pub fn new(text: &str) -> Self {
+        Self {
+            text: text.to_uppercase(),
+            style: BannerStyle::Block,
+        }
+    }
+
+    pub fn with_style(mut self, style: BannerStyle) -> Self {
+        self.style = style;
+        self
+    }
+
+    pub fn render(&self) -> String {
+        let mut output = String::new();
+
+        // Simple block letters for common characters
+        let chars: HashMap<char, [&str; 5]> = [
+            ('A', ["  █  ", " █ █ ", "█████", "█   █", "█   █"]),
+            ('B', ["████ ", "█   █", "████ ", "█   █", "████ "]),
+            ('C', [" ████", "█    ", "█    ", "█    ", " ████"]),
+            ('D', ["████ ", "█   █", "█   █", "█   █", "████ "]),
+            ('E', ["█████", "█    ", "████ ", "█    ", "█████"]),
+            ('F', ["█████", "█    ", "████ ", "█    ", "█    "]),
+            ('G', [" ████", "█    ", "█  ██", "█   █", " ████"]),
+            ('H', ["█   █", "█   █", "█████", "█   █", "█   █"]),
+            ('I', ["█████", "  █  ", "  █  ", "  █  ", "█████"]),
+            ('K', ["█   █", "█  █ ", "███  ", "█  █ ", "█   █"]),
+            ('L', ["█    ", "█    ", "█    ", "█    ", "█████"]),
+            ('M', ["█   █", "██ ██", "█ █ █", "█   █", "█   █"]),
+            ('N', ["█   █", "██  █", "█ █ █", "█  ██", "█   █"]),
+            ('O', [" ███ ", "█   █", "█   █", "█   █", " ███ "]),
+            ('P', ["████ ", "█   █", "████ ", "█    ", "█    "]),
+            ('R', ["████ ", "█   █", "████ ", "█  █ ", "█   █"]),
+            ('S', [" ████", "█    ", " ███ ", "    █", "████ "]),
+            ('T', ["█████", "  █  ", "  █  ", "  █  ", "  █  "]),
+            ('U', ["█   █", "█   █", "█   █", "█   █", " ███ "]),
+            ('V', ["█   █", "█   █", "█   █", " █ █ ", "  █  "]),
+            ('W', ["█   █", "█   █", "█ █ █", "██ ██", "█   █"]),
+            ('X', ["█   █", " █ █ ", "  █  ", " █ █ ", "█   █"]),
+            ('Y', ["█   █", " █ █ ", "  █  ", "  █  ", "  █  "]),
+            ('Z', ["█████", "   █ ", "  █  ", " █   ", "█████"]),
+            ('0', [" ███ ", "█  ██", "█ █ █", "██  █", " ███ "]),
+            ('1', ["  █  ", " ██  ", "  █  ", "  █  ", " ███ "]),
+            ('2', [" ███ ", "█   █", "  ██ ", " █   ", "█████"]),
+            ('3', ["████ ", "    █", " ███ ", "    █", "████ "]),
+            ('4', ["█   █", "█   █", "█████", "    █", "    █"]),
+            ('5', ["█████", "█    ", "████ ", "    █", "████ "]),
+            ('!', ["  █  ", "  █  ", "  █  ", "     ", "  █  "]),
+            (' ', ["     ", "     ", "     ", "     ", "     "]),
+        ].into_iter().collect();
+
+        for row in 0..5 {
+            output.push_str("  ");
+            for ch in self.text.chars() {
+                if let Some(pattern) = chars.get(&ch) {
+                    output.push_str(pattern[row]);
+                    output.push(' ');
+                }
+            }
+            output.push('\n');
+        }
+
+        output
+    }
+}
+
+/// Metric Card - Single metric with big number display
+pub struct MetricCard {
+    pub label: String,
+    pub value: String,
+    pub subtitle: Option<String>,
+    pub trend: Option<f64>,
+    pub color: String,
+}
+
+impl MetricCard {
+    pub fn new(label: &str, value: &str) -> Self {
+        Self {
+            label: label.to_string(),
+            value: value.to_string(),
+            subtitle: None,
+            trend: None,
+            color: "cyan".to_string(),
+        }
+    }
+
+    pub fn with_subtitle(mut self, subtitle: &str) -> Self {
+        self.subtitle = Some(subtitle.to_string());
+        self
+    }
+
+    pub fn with_trend(mut self, trend: f64) -> Self {
+        self.trend = Some(trend);
+        self
+    }
+
+    pub fn with_color(mut self, color: &str) -> Self {
+        self.color = color.to_string();
+        self
+    }
+
+    pub fn render(&self) -> String {
+        let mut output = String::new();
+        let width = 24;
+
+        output.push_str(&format!("  ┌{}┐\n", "─".repeat(width)));
+        output.push_str(&format!("  │ {:width$}│\n", self.label.dimmed(), width = width - 1));
+
+        let value_str = colorize_text(&self.value, &self.color).bold().to_string();
+        let trend_str = self.trend.map(|t| {
+            if t > 0.0 {
+                format!(" {}", format!("↑{:.0}%", t).green())
+            } else if t < 0.0 {
+                format!(" {}", format!("↓{:.0}%", t.abs()).red())
+            } else {
+                String::new()
+            }
+        }).unwrap_or_default();
+
+        output.push_str(&format!("  │ {}{:>width$}│\n", value_str, trend_str, width = width - self.value.len() - trend_str.len() - 1));
+
+        if let Some(ref sub) = self.subtitle {
+            output.push_str(&format!("  │ {:width$}│\n", sub.dimmed(), width = width - 1));
+        }
+
+        output.push_str(&format!("  └{}┘\n", "─".repeat(width)));
+
+        output
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

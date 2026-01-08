@@ -2423,8 +2423,123 @@ async fn main() -> Result<()> {
             line_chart.add_series(series);
             print!("{}", line_chart.render());
 
+            // ═══════════════════════════════════════════════════════════════
+            // NEW VISUALIZATIONS - Part 2
+            // ═══════════════════════════════════════════════════════════════
+
+            println!("\n{}", "═══════════════════════════════════════════════════════════════".magenta());
+            println!("{}", "  🎯 NEW VISUALIZATIONS".magenta().bold());
+            println!("{}", "═══════════════════════════════════════════════════════════════".magenta());
+
+            // 15. Gauge
+            println!("\n{}", "━━━ Gauge ━━━".yellow().bold());
+            let gauge = Gauge::new("CPU Usage", 73.5, 0.0, 100.0);
+            print!("{}", gauge.render());
+
+            // 16. Donut Chart
+            println!("\n{}", "━━━ Donut Chart ━━━".yellow().bold());
+            let mut donut = DonutChart::new("Token Distribution");
+            donut.add("Claude", 27_000_000.0, "cyan");
+            donut.add("Cursor", 18_000_000.0, "magenta");
+            donut.add("Cline", 2_100_000.0, "yellow");
+            print!("{}", donut.render());
+
+            // 17. Bullet Chart
+            println!("\n{}", "━━━ Bullet Chart ━━━".yellow().bold());
+            let bullet = BulletChart::new("Q4 Revenue", 85_000.0, 100_000.0);
+            print!("{}", bullet.render());
+
+            // 18. Funnel Chart
+            println!("\n{}", "━━━ Funnel Chart ━━━".yellow().bold());
+            let mut funnel = FunnelChart::new("User Conversion");
+            funnel.add("Visitors", 10000.0);
+            funnel.add("Sign-ups", 3500.0);
+            funnel.add("Active", 1200.0);
+            funnel.add("Paid", 450.0);
+            print!("{}", funnel.render());
+
+            // 19. Box Plot
+            println!("\n{}", "━━━ Box Plot (Session Duration) ━━━".yellow().bold());
+            let session_data: Vec<f64> = vec![
+                0.5, 1.0, 1.2, 1.5, 2.0, 2.1, 2.3, 2.5, 2.8, 3.0,
+                3.2, 3.5, 4.0, 4.5, 5.0, 6.0, 7.0, 8.0, 10.0, 12.0,
+            ];
+            let boxplot = BoxPlot::new("Session Duration (hrs)", &session_data);
+            print!("{}", boxplot.render());
+
+            // 20. Waterfall Chart
+            println!("\n{}", "━━━ Waterfall Chart ━━━".yellow().bold());
+            let mut waterfall = WaterfallChart::new("Monthly Token Usage");
+            waterfall.add("Week 1", 5_000_000.0);
+            waterfall.add("Week 2", 8_000_000.0);
+            waterfall.add("Week 3", -2_000_000.0);
+            waterfall.add("Week 4", 4_000_000.0);
+            waterfall.add_total("Total");
+            print!("{}", waterfall.render());
+
+            // 21. Radar Chart
+            println!("\n{}", "━━━ Radar Chart (Skills) ━━━".yellow().bold());
+            let mut radar = RadarChart::new("Developer Skills");
+            radar.add("Frontend", 0.85);
+            radar.add("Backend", 0.92);
+            radar.add("DevOps", 0.65);
+            radar.add("Testing", 0.78);
+            radar.add("Design", 0.45);
+            print!("{}", radar.render());
+
+            // 22. Matrix Heatmap
+            println!("\n{}", "━━━ Matrix Heatmap ━━━".yellow().bold());
+            let mut matrix = MatrixHeatmap::new("Activity by Day/Hour");
+            matrix.set_labels(
+                vec!["Mon", "Tue", "Wed", "Thu", "Fri"],
+                vec!["9AM", "12PM", "3PM", "6PM"],
+            );
+            matrix.set_data(vec![
+                vec![0.3, 0.8, 0.6, 0.2],
+                vec![0.5, 0.9, 0.7, 0.3],
+                vec![0.4, 1.0, 0.8, 0.4],
+                vec![0.6, 0.7, 0.9, 0.5],
+                vec![0.2, 0.5, 0.4, 0.1],
+            ]);
+            print!("{}", matrix.render());
+
+            // 23. Gantt Chart
+            println!("\n{}", "━━━ Gantt Chart ━━━".yellow().bold());
+            let mut gantt = GanttChart::new("Project Timeline", 30);
+            gantt.add("Research", 0, 5, "cyan");
+            gantt.add("Design", 3, 7, "magenta");
+            gantt.add("Development", 8, 15, "green");
+            gantt.add("Testing", 20, 8, "yellow");
+            print!("{}", gantt.render());
+
+            // 24. Mini Dashboard
+            println!("\n{}", "━━━ Mini Dashboard ━━━".yellow().bold());
+            let mut dashboard = MiniDashboard::new("Weekly Summary");
+            dashboard.add_metric("Tokens", "12.5M", Some(15.0));
+            dashboard.add_metric("Sessions", "42", Some(-5.0));
+            dashboard.add_metric("Avg Duration", "2.3h", None);
+            dashboard.add_metric("Cost", "$45.20", Some(8.0));
+            dashboard.add_sparkline("Daily", vec![1.2, 2.3, 3.1, 2.8, 4.2, 3.7, 3.2]);
+            print!("{}", dashboard.render());
+
+            // 25. ASCII Banner
+            println!("\n{}", "━━━ ASCII Banner ━━━".yellow().bold());
+            let banner = AsciiBanner::new("VIBE");
+            print!("{}", banner.render());
+
+            // 26. Metric Card
+            println!("\n{}", "━━━ Metric Cards ━━━".yellow().bold());
+            let card1 = MetricCard::new("Total Tokens", "47.1M")
+                .with_subtitle("Last 30 days")
+                .with_trend(12.5);
+            let card2 = MetricCard::new("Active Streak", "19 days")
+                .with_color("green")
+                .with_trend(0.0);
+            print!("{}", card1.render());
+            print!("{}", card2.render());
+
             println!("\n{}", "═══════════════════════════════════════════════════════════════".cyan());
-            println!("{}", "  Use these visualizations in your TUI with 'vibedev tui'".dimmed());
+            println!("{}", "  26 visualization types available! Use in TUI: 'vibedev tui'".dimmed());
             println!("{}", "═══════════════════════════════════════════════════════════════".cyan());
 
             Ok(())
