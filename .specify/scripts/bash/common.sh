@@ -151,6 +151,42 @@ get_feature_paths() {
     printf 'CONTRACTS_DIR=%s\n' "$feature_dir/contracts"
 }
 
+# Safe function to load feature paths without using eval
+# This prevents command injection through branch names or paths
+load_feature_paths() {
+    local feature_paths_output
+    feature_paths_output="$(get_feature_paths)"
+    
+    while IFS= read -r line; do
+        # Skip empty lines
+        [ -z "$line" ] && continue
+        
+        # Declare variables before case statement for proper scope
+        local var_name
+        local raw_value
+        
+        # Expect lines of the form NAME='value'
+        case "$line" in
+            *=*)
+                var_name=${line%%=*}
+                raw_value=${line#*=}
+                ;;
+            *)
+                # Ignore malformed lines
+                continue
+                ;;
+        esac
+        
+        # Strip a single pair of surrounding single quotes, if present
+        if [[ "$raw_value" == \'*\' ]]; then
+            raw_value=${raw_value:1:-1}
+        fi
+        
+        # Assign value to the variable name without evaluation
+        printf -v "$var_name" '%s' "$raw_value"
+    done <<< "$feature_paths_output"
+}
+
 check_file() { [[ -f "$1" ]] && echo "  ✓ $2" || echo "  ✗ $2"; }
 check_dir() { [[ -d "$1" && -n $(ls -A "$1" 2>/dev/null) ]] && echo "  ✓ $2" || echo "  ✗ $2"; }
 
