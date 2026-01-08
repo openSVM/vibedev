@@ -1,8 +1,8 @@
 // Shell history sanitizer - Strip API keys, secrets, and sensitive data
+use anyhow::Result;
 use regex::Regex;
 use std::fs;
-use std::path::PathBuf;
-use anyhow::Result;
+use std::path::{Path, PathBuf};
 
 pub struct HistorySanitizer {
     patterns: Vec<(Regex, &'static str)>,
@@ -91,7 +91,7 @@ impl HistorySanitizer {
     }
 
     /// Find and sanitize all shell history files
-    pub fn find_and_sanitize_history(&self, home_dir: &PathBuf) -> Result<Vec<(String, String)>> {
+    pub fn find_and_sanitize_history(&self, home_dir: &Path) -> Result<Vec<(String, String)>> {
         let mut histories = Vec::new();
 
         // Common shell history locations
@@ -139,27 +139,31 @@ mod tests {
         let test_cases = vec![
             (
                 "export OPENAI_API_KEY=sk-abcd1234efgh5678ijkl9012mnop3456qrst7890uvwx",
-                "export [REDACTED_API_KEY_ENV]"
+                "export [REDACTED_API_KEY_ENV]",
             ),
             (
                 "curl -H 'Authorization: Bearer sk-ant-api03-abc123def456'",
-                "curl -H 'Authorization: Bearer [REDACTED_ANTHROPIC_KEY]'"
+                "curl -H 'Authorization: Bearer [REDACTED_ANTHROPIC_KEY]'",
             ),
             (
                 "git clone https://user:ghp_abc123def456ghi789jkl012mno345@github.com/repo.git",
-                "git clone https://[USER]:[REDACTED]@github.com/repo.git"
+                "git clone https://[USER]:[REDACTED]@github.com/repo.git",
             ),
             (
                 "mysql -u root -p MySecretPass123 -h localhost",
-                "mysql -u root [REDACTED_PASSWORD] -h localhost"
+                "mysql -u root [REDACTED_PASSWORD] -h localhost",
             ),
         ];
 
         for (input, expected) in test_cases {
             let result = sanitizer.sanitize_line(input);
-            assert!(result.contains("[REDACTED"),
+            assert!(
+                result.contains("[REDACTED"),
                 "Failed to sanitize: {}\nGot: {}\nExpected: {}",
-                input, result, expected);
+                input,
+                result,
+                expected
+            );
         }
     }
 

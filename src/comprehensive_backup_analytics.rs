@@ -4,9 +4,9 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 use crate::ai_impact_analyzer::{AIImpactAnalyzer, AIImpactReport};
-use crate::shell_analytics::{ShellAnalyzer, ShellAnalytics};
-use crate::workflow_correlation::{WorkflowAnalyzer, WorkflowCorrelation};
 use crate::history_sanitizer::HistorySanitizer;
+use crate::shell_analytics::{ShellAnalytics, ShellAnalyzer};
+use crate::workflow_correlation::{WorkflowAnalyzer, WorkflowCorrelation};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ComprehensiveBackupAnalytics {
@@ -36,11 +36,11 @@ pub enum Priority {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ProductivityScore {
-    pub overall: f64,           // 0-100
-    pub ai_effectiveness: f64,  // 0-100
-    pub shell_efficiency: f64,  // 0-100
-    pub workflow_quality: f64,  // 0-100
-    pub grade: String,          // A+ to F
+    pub overall: f64,          // 0-100
+    pub ai_effectiveness: f64, // 0-100
+    pub shell_efficiency: f64, // 0-100
+    pub workflow_quality: f64, // 0-100
+    pub grade: String,         // A+ to F
 }
 
 pub struct ComprehensiveAnalyticsEngine {
@@ -88,25 +88,21 @@ impl ComprehensiveAnalyticsEngine {
         let workflow_analyzer = WorkflowAnalyzer::new(
             shell_analytics.struggle_sessions.clone(),
             vec![], // Would need to extract from AI analyzer
-            ai_impact.pair_programming_sessions.iter()
+            ai_impact
+                .pair_programming_sessions
+                .iter()
                 .flat_map(|s| s.git_commits.clone())
                 .collect(),
         );
         let workflow_correlation = workflow_analyzer.analyze();
 
         // 4. Generate Actionable Recommendations
-        let recommendations = self.generate_recommendations(
-            &ai_impact,
-            &shell_analytics,
-            &workflow_correlation,
-        );
+        let recommendations =
+            self.generate_recommendations(&ai_impact, &shell_analytics, &workflow_correlation);
 
         // 5. Calculate Overall Productivity Score
-        let overall_score = self.calculate_productivity_score(
-            &ai_impact,
-            &shell_analytics,
-            &workflow_correlation,
-        );
+        let overall_score =
+            self.calculate_productivity_score(&ai_impact, &shell_analytics, &workflow_correlation);
 
         Ok(ComprehensiveBackupAnalytics {
             ai_impact,
@@ -140,8 +136,13 @@ impl ComprehensiveAnalyticsEngine {
             recommendations.push(Recommendation {
                 priority: Priority::Low,
                 category: "AI Usage".to_string(),
-                issue: format!("You're {:.1}% faster with AI - great!", ai.velocity_improvement),
-                action: "Keep using AI for complex tasks. Consider sharing your workflow with team.".to_string(),
+                issue: format!(
+                    "You're {:.1}% faster with AI - great!",
+                    ai.velocity_improvement
+                ),
+                action:
+                    "Keep using AI for complex tasks. Consider sharing your workflow with team."
+                        .to_string(),
                 potential_impact: "Team velocity could improve similarly".to_string(),
             });
         }
@@ -161,8 +162,13 @@ impl ComprehensiveAnalyticsEngine {
             recommendations.push(Recommendation {
                 priority: Priority::Medium,
                 category: "Workflow".to_string(),
-                issue: format!("Detected {} struggle sessions (multiple retries)", shell.struggle_sessions.len()),
-                action: "Ask Claude earlier when stuck. Average 4+ retries before AI help - ask sooner!".to_string(),
+                issue: format!(
+                    "Detected {} struggle sessions (multiple retries)",
+                    shell.struggle_sessions.len()
+                ),
+                action:
+                    "Ask Claude earlier when stuck. Average 4+ retries before AI help - ask sooner!"
+                        .to_string(),
                 potential_impact: "Reduce frustration, solve problems 3x faster".to_string(),
             });
         }
@@ -213,13 +219,14 @@ impl ComprehensiveAnalyticsEngine {
         // AI Effectiveness Score (0-100)
         let ai_effectiveness = if ai.ai_assisted_commits > 0 {
             let velocity_score = (ai.velocity_improvement / 100.0 * 50.0).min(50.0);
-            let quality_score = if ai.copy_paste_incidents as f64 / (ai.ai_assisted_commits as f64) < 0.1 {
-                50.0
-            } else if ai.copy_paste_incidents as f64 / (ai.ai_assisted_commits as f64) < 0.2 {
-                30.0
-            } else {
-                10.0
-            };
+            let quality_score =
+                if ai.copy_paste_incidents as f64 / (ai.ai_assisted_commits as f64) < 0.1 {
+                    50.0
+                } else if ai.copy_paste_incidents as f64 / (ai.ai_assisted_commits as f64) < 0.2 {
+                    30.0
+                } else {
+                    10.0
+                };
             velocity_score + quality_score
         } else {
             0.0
@@ -231,17 +238,19 @@ impl ComprehensiveAnalyticsEngine {
         // Workflow Quality Score (0-100)
         let workflow_quality = if workflow.total_workflows > 0 {
             let helpfulness_score = (workflow.ai_helpfulness_rate / 100.0 * 60.0).min(60.0);
-            let pattern_score = if workflow.full_cycle_instances > 10 { 40.0 } else { 20.0 };
+            let pattern_score = if workflow.full_cycle_instances > 10 {
+                40.0
+            } else {
+                20.0
+            };
             helpfulness_score + pattern_score
         } else {
             50.0
         };
 
         // Overall Score (weighted average)
-        let overall = (ai_effectiveness * 0.4
-            + shell_efficiency * 0.3
-            + workflow_quality * 0.3)
-            .min(100.0);
+        let overall =
+            (ai_effectiveness * 0.4 + shell_efficiency * 0.3 + workflow_quality * 0.3).min(100.0);
 
         let grade = if overall >= 90.0 {
             "A+"

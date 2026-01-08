@@ -5,7 +5,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
-use walkdir::WalkDir;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkSession {
@@ -64,7 +63,9 @@ pub struct TimelineStats {
     pub ongoing: usize,
     pub completion_rate: f64,
     pub avg_session_hours: f64,
+    #[allow(dead_code)]
     pub avg_abandonment_days: f64,
+    #[allow(dead_code)]
     pub longest_gap_days: i64,
     pub most_worked_project: String,
     pub context_switches: usize,
@@ -83,7 +84,12 @@ impl TimelineAnalyzer {
         self.analyze_with_options(None, false, false)
     }
 
-    pub fn analyze_with_options(&self, months_back: Option<i64>, cluster: bool, skip_noise: bool) -> Result<Timeline> {
+    pub fn analyze_with_options(
+        &self,
+        months_back: Option<i64>,
+        cluster: bool,
+        skip_noise: bool,
+    ) -> Result<Timeline> {
         let mut sessions = Vec::new();
 
         // AI Coding Assistants
@@ -162,9 +168,9 @@ impl TimelineAnalyzer {
         if skip_noise {
             sessions.retain(|s| {
                 !s.project.starts_with("Shell")
-                && !s.project.starts_with("Vim")
-                && !s.project.starts_with("VSCode")
-                && !s.project.starts_with("Tmux")
+                    && !s.project.starts_with("Vim")
+                    && !s.project.starts_with("VSCode")
+                    && !s.project.starts_with("Tmux")
             });
         }
 
@@ -195,8 +201,7 @@ impl TimelineAnalyzer {
 
         let cluster_window = Duration::hours(2); // Sessions within 2 hours = same cluster
 
-        for i in 1..sessions.len() {
-            let session = &sessions[i];
+        for session in sessions.iter().skip(1) {
             let last = current_cluster.last().unwrap();
 
             // Same project and within time window?
@@ -321,7 +326,8 @@ impl TimelineAnalyzer {
 
                     // Extract description from first user message
                     if description.is_empty() {
-                        if let Some(msg) = entry.get("userMessage").or_else(|| entry.get("prompt")) {
+                        if let Some(msg) = entry.get("userMessage").or_else(|| entry.get("prompt"))
+                        {
                             if let Some(text) = msg.as_str() {
                                 description = text.lines().next().unwrap_or("").to_string();
                                 if description.len() > 60 {
@@ -361,7 +367,9 @@ impl TimelineAnalyzer {
 
     fn parse_cline_tasks(&self) -> Result<Vec<WorkSession>> {
         let mut sessions = Vec::new();
-        let tasks_dir = self.base_dir.join(".config/Code/User/globalStorage/saoudrizwan.claude-dev/tasks");
+        let tasks_dir = self
+            .base_dir
+            .join(".config/Code/User/globalStorage/saoudrizwan.claude-dev/tasks");
 
         if !tasks_dir.exists() {
             return Ok(sessions);
@@ -393,7 +401,8 @@ impl TimelineAnalyzer {
 
                     for msg in messages_arr {
                         if let Some(ts) = msg.get("timestamp").and_then(|t| t.as_i64()) {
-                            let ts_utc = DateTime::from_timestamp(ts / 1000, 0).unwrap_or(Utc::now());
+                            let ts_utc =
+                                DateTime::from_timestamp(ts / 1000, 0).unwrap_or(Utc::now());
                             if start_time.is_none() || ts_utc < start_time.unwrap() {
                                 start_time = Some(ts_utc);
                             }
@@ -437,7 +446,9 @@ impl TimelineAnalyzer {
 
     fn parse_kilo_tasks(&self) -> Result<Vec<WorkSession>> {
         let mut sessions = Vec::new();
-        let tasks_dir = self.base_dir.join(".config/Code/User/globalStorage/kilocode.kilo-code/tasks");
+        let tasks_dir = self
+            .base_dir
+            .join(".config/Code/User/globalStorage/kilocode.kilo-code/tasks");
 
         if !tasks_dir.exists() {
             return Ok(sessions);
@@ -469,7 +480,8 @@ impl TimelineAnalyzer {
 
                     for msg in messages_arr {
                         if let Some(ts) = msg.get("timestamp").and_then(|t| t.as_i64()) {
-                            let ts_utc = DateTime::from_timestamp(ts / 1000, 0).unwrap_or(Utc::now());
+                            let ts_utc =
+                                DateTime::from_timestamp(ts / 1000, 0).unwrap_or(Utc::now());
                             if start_time.is_none() || ts_utc < start_time.unwrap() {
                                 start_time = Some(ts_utc);
                             }
@@ -513,7 +525,9 @@ impl TimelineAnalyzer {
 
     fn parse_roo_tasks(&self) -> Result<Vec<WorkSession>> {
         let mut sessions = Vec::new();
-        let tasks_dir = self.base_dir.join(".config/Code/User/globalStorage/rooveterinaryinc.roo-cline/tasks");
+        let tasks_dir = self
+            .base_dir
+            .join(".config/Code/User/globalStorage/rooveterinaryinc.roo-cline/tasks");
 
         if !tasks_dir.exists() {
             return Ok(sessions);
@@ -545,7 +559,8 @@ impl TimelineAnalyzer {
 
                     for msg in messages_arr {
                         if let Some(ts) = msg.get("timestamp").and_then(|t| t.as_i64()) {
-                            let ts_utc = DateTime::from_timestamp(ts / 1000, 0).unwrap_or(Utc::now());
+                            let ts_utc =
+                                DateTime::from_timestamp(ts / 1000, 0).unwrap_or(Utc::now());
                             if start_time.is_none() || ts_utc < start_time.unwrap() {
                                 start_time = Some(ts_utc);
                             }
@@ -624,10 +639,13 @@ impl TimelineAnalyzer {
 
                                 // Try parsing as JSON first
                                 if let Ok(entry) = serde_json::from_str::<serde_json::Value>(line) {
-                                    if let Some(ts_str) = entry.get("timestamp").and_then(|t| t.as_str()) {
+                                    if let Some(ts_str) =
+                                        entry.get("timestamp").and_then(|t| t.as_str())
+                                    {
                                         if let Ok(ts) = DateTime::parse_from_rfc3339(ts_str) {
                                             let ts_utc = ts.with_timezone(&Utc);
-                                            if start_time.is_none() || ts_utc < start_time.unwrap() {
+                                            if start_time.is_none() || ts_utc < start_time.unwrap()
+                                            {
                                                 start_time = Some(ts_utc);
                                             }
                                             if end_time.is_none() || ts_utc > end_time.unwrap() {
@@ -637,8 +655,11 @@ impl TimelineAnalyzer {
                                     }
 
                                     if description.is_empty() {
-                                        if let Some(msg) = entry.get("message").and_then(|m| m.as_str()) {
-                                            description = msg.lines().next().unwrap_or("").to_string();
+                                        if let Some(msg) =
+                                            entry.get("message").and_then(|m| m.as_str())
+                                        {
+                                            description =
+                                                msg.lines().next().unwrap_or("").to_string();
                                             if description.len() > 60 {
                                                 description = format!("{}...", &description[..60]);
                                             }
@@ -655,7 +676,11 @@ impl TimelineAnalyzer {
                                     start,
                                     end,
                                     project: "Cursor".to_string(),
-                                    description: if description.is_empty() { "Cursor session".to_string() } else { description },
+                                    description: if description.is_empty() {
+                                        "Cursor session".to_string()
+                                    } else {
+                                        description
+                                    },
                                     conversations: 1,
                                     messages: message_count,
                                     outcome: SessionOutcome::Ongoing,
@@ -677,7 +702,8 @@ impl TimelineAnalyzer {
 
         let continue_dirs = vec![
             self.base_dir.join(".continue"),
-            self.base_dir.join(".config/Code/User/globalStorage/continue.continue"),
+            self.base_dir
+                .join(".config/Code/User/globalStorage/continue.continue"),
         ];
 
         for continue_dir in continue_dirs {
@@ -693,31 +719,48 @@ impl TimelineAnalyzer {
                         let path = entry.path();
                         if path.extension().and_then(|e| e.to_str()) == Some("json") {
                             if let Ok(content) = fs::read_to_string(&path) {
-                                if let Ok(session_data) = serde_json::from_str::<serde_json::Value>(&content) {
+                                if let Ok(session_data) =
+                                    serde_json::from_str::<serde_json::Value>(&content)
+                                {
                                     let mut start_time: Option<DateTime<Utc>> = None;
                                     let mut end_time: Option<DateTime<Utc>> = None;
                                     let mut description = String::new();
                                     let mut message_count = 0;
 
-                                    if let Some(messages) = session_data.get("messages").and_then(|m| m.as_array()) {
+                                    if let Some(messages) =
+                                        session_data.get("messages").and_then(|m| m.as_array())
+                                    {
                                         message_count = messages.len();
 
                                         for msg in messages {
-                                            if let Some(ts) = msg.get("timestamp").and_then(|t| t.as_i64()) {
-                                                let ts_utc = DateTime::from_timestamp(ts / 1000, 0).unwrap_or(Utc::now());
-                                                if start_time.is_none() || ts_utc < start_time.unwrap() {
+                                            if let Some(ts) =
+                                                msg.get("timestamp").and_then(|t| t.as_i64())
+                                            {
+                                                let ts_utc = DateTime::from_timestamp(ts / 1000, 0)
+                                                    .unwrap_or(Utc::now());
+                                                if start_time.is_none()
+                                                    || ts_utc < start_time.unwrap()
+                                                {
                                                     start_time = Some(ts_utc);
                                                 }
-                                                if end_time.is_none() || ts_utc > end_time.unwrap() {
+                                                if end_time.is_none() || ts_utc > end_time.unwrap()
+                                                {
                                                     end_time = Some(ts_utc);
                                                 }
                                             }
 
                                             if description.is_empty() {
-                                                if let Some(content) = msg.get("content").and_then(|c| c.as_str()) {
-                                                    description = content.lines().next().unwrap_or("").to_string();
+                                                if let Some(content) =
+                                                    msg.get("content").and_then(|c| c.as_str())
+                                                {
+                                                    description = content
+                                                        .lines()
+                                                        .next()
+                                                        .unwrap_or("")
+                                                        .to_string();
                                                     if description.len() > 60 {
-                                                        description = format!("{}...", &description[..60]);
+                                                        description =
+                                                            format!("{}...", &description[..60]);
                                                     }
                                                 }
                                             }
@@ -728,11 +771,19 @@ impl TimelineAnalyzer {
                                         let hours = (end - start).num_seconds() as f64 / 3600.0;
 
                                         sessions.push(WorkSession {
-                                            id: path.file_stem().and_then(|s| s.to_str()).unwrap_or("unknown").to_string(),
+                                            id: path
+                                                .file_stem()
+                                                .and_then(|s| s.to_str())
+                                                .unwrap_or("unknown")
+                                                .to_string(),
                                             start,
                                             end,
                                             project: "Continue".to_string(),
-                                            description: if description.is_empty() { "Continue session".to_string() } else { description },
+                                            description: if description.is_empty() {
+                                                "Continue session".to_string()
+                                            } else {
+                                                description
+                                            },
                                             conversations: 1,
                                             messages: message_count,
                                             outcome: SessionOutcome::Ongoing,
@@ -784,7 +835,8 @@ impl TimelineAnalyzer {
                                 message_count += 1;
 
                                 if description.is_empty() && line.len() > 2 {
-                                    let msg = line.trim_start_matches('>').trim_start_matches('#').trim();
+                                    let msg =
+                                        line.trim_start_matches('>').trim_start_matches('#').trim();
                                     description = msg.to_string();
                                     if description.len() > 60 {
                                         description = format!("{}...", &description[..60]);
@@ -811,7 +863,11 @@ impl TimelineAnalyzer {
                                 start,
                                 end,
                                 project: "Aider".to_string(),
-                                description: if description.is_empty() { "Aider session".to_string() } else { description },
+                                description: if description.is_empty() {
+                                    "Aider session".to_string()
+                                } else {
+                                    description
+                                },
                                 conversations: 1,
                                 messages: message_count,
                                 outcome: SessionOutcome::Ongoing,
@@ -857,8 +913,7 @@ impl TimelineAnalyzer {
             if is_ai_session {
                 // Check if resumed in a later session
                 let mut resumed_at = None;
-                for j in (i + 1)..sessions.len() {
-                    let other = &sessions[j];
+                for other in sessions.iter().skip(i + 1) {
                     let gap_days = (other.start - session.end).num_days();
 
                     // Only consider it a resume if gap > 7 days and related
@@ -887,8 +942,16 @@ impl TimelineAnalyzer {
     }
 
     fn is_related(&self, desc1: &str, desc2: &str) -> bool {
-        let words1: Vec<String> = desc1.to_lowercase().split_whitespace().map(String::from).collect();
-        let words2: Vec<String> = desc2.to_lowercase().split_whitespace().map(String::from).collect();
+        let words1: Vec<String> = desc1
+            .to_lowercase()
+            .split_whitespace()
+            .map(String::from)
+            .collect();
+        let words2: Vec<String> = desc2
+            .to_lowercase()
+            .split_whitespace()
+            .map(String::from)
+            .collect();
 
         let common_words: usize = words1
             .iter()
@@ -900,10 +963,22 @@ impl TimelineAnalyzer {
 
     fn calculate_stats(&self, sessions: &[WorkSession]) -> TimelineStats {
         let total_sessions = sessions.len();
-        let completed = sessions.iter().filter(|s| matches!(s.outcome, SessionOutcome::Completed)).count();
-        let abandoned = sessions.iter().filter(|s| matches!(s.outcome, SessionOutcome::Abandoned)).count();
-        let resumed = sessions.iter().filter(|s| matches!(s.outcome, SessionOutcome::Resumed(_))).count();
-        let ongoing = sessions.iter().filter(|s| matches!(s.outcome, SessionOutcome::Ongoing)).count();
+        let completed = sessions
+            .iter()
+            .filter(|s| matches!(s.outcome, SessionOutcome::Completed))
+            .count();
+        let abandoned = sessions
+            .iter()
+            .filter(|s| matches!(s.outcome, SessionOutcome::Abandoned))
+            .count();
+        let resumed = sessions
+            .iter()
+            .filter(|s| matches!(s.outcome, SessionOutcome::Resumed(_)))
+            .count();
+        let ongoing = sessions
+            .iter()
+            .filter(|s| matches!(s.outcome, SessionOutcome::Ongoing))
+            .count();
 
         let completion_rate = if total_sessions > 0 {
             (completed as f64 / total_sessions as f64) * 100.0
@@ -919,7 +994,12 @@ impl TimelineAnalyzer {
 
         let abandoned_sessions: Vec<_> = sessions
             .iter()
-            .filter(|s| matches!(s.outcome, SessionOutcome::Abandoned | SessionOutcome::Resumed(_)))
+            .filter(|s| {
+                matches!(
+                    s.outcome,
+                    SessionOutcome::Abandoned | SessionOutcome::Resumed(_)
+                )
+            })
             .collect();
 
         let avg_abandonment_days = if !abandoned_sessions.is_empty() {
@@ -927,7 +1007,7 @@ impl TimelineAnalyzer {
                 .iter()
                 .map(|s| (Utc::now() - s.end).num_days())
                 .sum();
-            (total_days as f64 / abandoned_sessions.len() as f64)
+            total_days as f64 / abandoned_sessions.len() as f64
         } else {
             0.0
         };
@@ -994,7 +1074,9 @@ impl TimelineAnalyzer {
                 if let Some(filename) = path.file_name().and_then(|n| n.to_str()) {
                     if filename.contains("chat") || filename.contains("history") {
                         if let Ok(metadata) = fs::metadata(&path) {
-                            if let (Ok(created), Ok(modified)) = (metadata.created(), metadata.modified()) {
+                            if let (Ok(created), Ok(modified)) =
+                                (metadata.created(), metadata.modified())
+                            {
                                 let start_time: DateTime<Utc> = created.into();
                                 let end_time: DateTime<Utc> = modified.into();
                                 let hours = (end_time - start_time).num_seconds() as f64 / 3600.0;
@@ -1025,7 +1107,8 @@ impl TimelineAnalyzer {
         let mut sessions = Vec::new();
         let cody_dirs = vec![
             self.base_dir.join(".cody"),
-            self.base_dir.join(".config/Code/User/globalStorage/sourcegraph.cody-ai"),
+            self.base_dir
+                .join(".config/Code/User/globalStorage/sourcegraph.cody-ai"),
         ];
 
         for cody_dir in cody_dirs {
@@ -1035,13 +1118,20 @@ impl TimelineAnalyzer {
                         let path = entry.path();
                         if path.extension().and_then(|e| e.to_str()) == Some("json") {
                             if let Ok(metadata) = fs::metadata(&path) {
-                                if let (Ok(created), Ok(modified)) = (metadata.created(), metadata.modified()) {
+                                if let (Ok(created), Ok(modified)) =
+                                    (metadata.created(), metadata.modified())
+                                {
                                     let start_time: DateTime<Utc> = created.into();
                                     let end_time: DateTime<Utc> = modified.into();
-                                    let hours = (end_time - start_time).num_seconds() as f64 / 3600.0;
+                                    let hours =
+                                        (end_time - start_time).num_seconds() as f64 / 3600.0;
 
                                     sessions.push(WorkSession {
-                                        id: path.file_name().and_then(|n| n.to_str()).unwrap_or("unknown").to_string(),
+                                        id: path
+                                            .file_name()
+                                            .and_then(|n| n.to_str())
+                                            .unwrap_or("unknown")
+                                            .to_string(),
                                         start: start_time,
                                         end: end_time,
                                         project: "Cody".to_string(),
@@ -1078,7 +1168,9 @@ impl TimelineAnalyzer {
                 if let Some(filename) = path.file_name().and_then(|n| n.to_str()) {
                     if filename.contains("log") {
                         if let Ok(metadata) = fs::metadata(&path) {
-                            if let (Ok(created), Ok(modified)) = (metadata.created(), metadata.modified()) {
+                            if let (Ok(created), Ok(modified)) =
+                                (metadata.created(), metadata.modified())
+                            {
                                 let start_time: DateTime<Utc> = created.into();
                                 let end_time: DateTime<Utc> = modified.into();
                                 let hours = (end_time - start_time).num_seconds() as f64 / 3600.0;
@@ -1107,7 +1199,9 @@ impl TimelineAnalyzer {
 
     fn parse_copilot_logs(&self) -> Result<Vec<WorkSession>> {
         let mut sessions = Vec::new();
-        let copilot_dir = self.base_dir.join(".config/Code/User/globalStorage/github.copilot-chat");
+        let copilot_dir = self
+            .base_dir
+            .join(".config/Code/User/globalStorage/github.copilot-chat");
 
         if !copilot_dir.exists() {
             return Ok(sessions);
@@ -1122,8 +1216,10 @@ impl TimelineAnalyzer {
                         if let Ok(data) = serde_json::from_str::<serde_json::Value>(&content) {
                             if let Some(chats) = data.get("chats").and_then(|c| c.as_array()) {
                                 for chat in chats {
-                                    if let Some(ts) = chat.get("timestamp").and_then(|t| t.as_i64()) {
-                                        let start_time = DateTime::from_timestamp(ts / 1000, 0).unwrap_or(Utc::now());
+                                    if let Some(ts) = chat.get("timestamp").and_then(|t| t.as_i64())
+                                    {
+                                        let start_time = DateTime::from_timestamp(ts / 1000, 0)
+                                            .unwrap_or(Utc::now());
                                         let end_time = start_time + Duration::hours(1); // Estimate 1 hour
 
                                         sessions.push(WorkSession {
@@ -1133,7 +1229,11 @@ impl TimelineAnalyzer {
                                             project: "Copilot".to_string(),
                                             description: "GitHub Copilot chat".to_string(),
                                             conversations: 1,
-                                            messages: chat.get("messages").and_then(|m| m.as_array()).map(|a| a.len()).unwrap_or(0),
+                                            messages: chat
+                                                .get("messages")
+                                                .and_then(|m| m.as_array())
+                                                .map(|a| a.len())
+                                                .unwrap_or(0),
                                             outcome: SessionOutcome::Ongoing,
                                             resumed_from: None,
                                             hours: 1.0,
@@ -1152,7 +1252,9 @@ impl TimelineAnalyzer {
 
     fn parse_codegpt_logs(&self) -> Result<Vec<WorkSession>> {
         let mut sessions = Vec::new();
-        let codegpt_dir = self.base_dir.join(".config/Code/User/globalStorage/danielsanmedium.dscodegpt");
+        let codegpt_dir = self
+            .base_dir
+            .join(".config/Code/User/globalStorage/danielsanmedium.dscodegpt");
 
         if codegpt_dir.exists() {
             // Parse CodeGPT logs (similar pattern)
@@ -1160,13 +1262,19 @@ impl TimelineAnalyzer {
                 for entry in entries.flatten() {
                     let path = entry.path();
                     if let Ok(metadata) = fs::metadata(&path) {
-                        if let (Ok(created), Ok(modified)) = (metadata.created(), metadata.modified()) {
+                        if let (Ok(created), Ok(modified)) =
+                            (metadata.created(), metadata.modified())
+                        {
                             let start_time: DateTime<Utc> = created.into();
                             let end_time: DateTime<Utc> = modified.into();
                             let hours = (end_time - start_time).num_seconds() as f64 / 3600.0;
 
                             sessions.push(WorkSession {
-                                id: path.file_name().and_then(|n| n.to_str()).unwrap_or("unknown").to_string(),
+                                id: path
+                                    .file_name()
+                                    .and_then(|n| n.to_str())
+                                    .unwrap_or("unknown")
+                                    .to_string(),
                                 start: start_time,
                                 end: end_time,
                                 project: "CodeGPT".to_string(),
@@ -1188,20 +1296,28 @@ impl TimelineAnalyzer {
 
     fn parse_bito_logs(&self) -> Result<Vec<WorkSession>> {
         let mut sessions = Vec::new();
-        let bito_dir = self.base_dir.join(".config/Code/User/globalStorage/bito.bito");
+        let bito_dir = self
+            .base_dir
+            .join(".config/Code/User/globalStorage/bito.bito");
 
         if bito_dir.exists() {
             if let Ok(entries) = fs::read_dir(&bito_dir) {
                 for entry in entries.flatten() {
                     let path = entry.path();
                     if let Ok(metadata) = fs::metadata(&path) {
-                        if let (Ok(created), Ok(modified)) = (metadata.created(), metadata.modified()) {
+                        if let (Ok(created), Ok(modified)) =
+                            (metadata.created(), metadata.modified())
+                        {
                             let start_time: DateTime<Utc> = created.into();
                             let end_time: DateTime<Utc> = modified.into();
                             let hours = (end_time - start_time).num_seconds() as f64 / 3600.0;
 
                             sessions.push(WorkSession {
-                                id: path.file_name().and_then(|n| n.to_str()).unwrap_or("unknown").to_string(),
+                                id: path
+                                    .file_name()
+                                    .and_then(|n| n.to_str())
+                                    .unwrap_or("unknown")
+                                    .to_string(),
                                 start: start_time,
                                 end: end_time,
                                 project: "Bito".to_string(),
@@ -1223,20 +1339,28 @@ impl TimelineAnalyzer {
 
     fn parse_amazonq_logs(&self) -> Result<Vec<WorkSession>> {
         let mut sessions = Vec::new();
-        let amazonq_dir = self.base_dir.join(".config/Code/User/globalStorage/amazonwebservices.amazon-q-vscode");
+        let amazonq_dir = self
+            .base_dir
+            .join(".config/Code/User/globalStorage/amazonwebservices.amazon-q-vscode");
 
         if amazonq_dir.exists() {
             if let Ok(entries) = fs::read_dir(&amazonq_dir) {
                 for entry in entries.flatten() {
                     let path = entry.path();
                     if let Ok(metadata) = fs::metadata(&path) {
-                        if let (Ok(created), Ok(modified)) = (metadata.created(), metadata.modified()) {
+                        if let (Ok(created), Ok(modified)) =
+                            (metadata.created(), metadata.modified())
+                        {
                             let start_time: DateTime<Utc> = created.into();
                             let end_time: DateTime<Utc> = modified.into();
                             let hours = (end_time - start_time).num_seconds() as f64 / 3600.0;
 
                             sessions.push(WorkSession {
-                                id: path.file_name().and_then(|n| n.to_str()).unwrap_or("unknown").to_string(),
+                                id: path
+                                    .file_name()
+                                    .and_then(|n| n.to_str())
+                                    .unwrap_or("unknown")
+                                    .to_string(),
                                 start: start_time,
                                 end: end_time,
                                 project: "AmazonQ".to_string(),
@@ -1265,13 +1389,19 @@ impl TimelineAnalyzer {
                 for entry in entries.flatten() {
                     let path = entry.path();
                     if let Ok(metadata) = fs::metadata(&path) {
-                        if let (Ok(created), Ok(modified)) = (metadata.created(), metadata.modified()) {
+                        if let (Ok(created), Ok(modified)) =
+                            (metadata.created(), metadata.modified())
+                        {
                             let start_time: DateTime<Utc> = created.into();
                             let end_time: DateTime<Utc> = modified.into();
                             let hours = (end_time - start_time).num_seconds() as f64 / 3600.0;
 
                             sessions.push(WorkSession {
-                                id: path.file_name().and_then(|n| n.to_str()).unwrap_or("unknown").to_string(),
+                                id: path
+                                    .file_name()
+                                    .and_then(|n| n.to_str())
+                                    .unwrap_or("unknown")
+                                    .to_string(),
                                 start: start_time,
                                 end: end_time,
                                 project: "Supermaven".to_string(),
@@ -1324,8 +1454,9 @@ impl TimelineAnalyzer {
                             let timestamp = parts[3].parse::<i64>().unwrap_or(0);
                             let message = parts[4];
 
-                            let commit_time = DateTime::from_timestamp(timestamp, 0).unwrap_or(Utc::now());
-                            let end_time = commit_time + Duration::minutes(30); // Estimate 30min per commit
+                            let commit_time =
+                                DateTime::from_timestamp(timestamp, 0).unwrap_or(Utc::now());
+                            let _end_time = commit_time + Duration::minutes(30); // Estimate 30min per commit
 
                             let repo_name = repo_path
                                 .file_name()
@@ -1340,7 +1471,7 @@ impl TimelineAnalyzer {
                                 project: format!("Git: {}", repo_name),
                                 description: message.to_string(),
                                 conversations: 0,
-                                messages: 1, // 1 commit
+                                messages: 1,                        // 1 commit
                                 outcome: SessionOutcome::Completed, // Commits are completed work!
                                 resumed_from: None,
                                 hours: 0.5,
@@ -1466,13 +1597,19 @@ impl TimelineAnalyzer {
                     for entry in entries.flatten() {
                         let path = entry.path();
                         if let Ok(metadata) = fs::metadata(&path) {
-                            if let (Ok(created), Ok(modified)) = (metadata.created(), metadata.modified()) {
+                            if let (Ok(created), Ok(modified)) =
+                                (metadata.created(), metadata.modified())
+                            {
                                 let start_time: DateTime<Utc> = created.into();
                                 let end_time: DateTime<Utc> = modified.into();
                                 let hours = (end_time - start_time).num_seconds() as f64 / 3600.0;
 
                                 sessions.push(WorkSession {
-                                    id: path.file_name().and_then(|n| n.to_str()).unwrap_or("vim-session").to_string(),
+                                    id: path
+                                        .file_name()
+                                        .and_then(|n| n.to_str())
+                                        .unwrap_or("vim-session")
+                                        .to_string(),
                                     start: start_time,
                                     end: end_time,
                                     project: "Vim".to_string(),
@@ -1507,13 +1644,19 @@ impl TimelineAnalyzer {
                     let path = entry.path();
                     if path.is_dir() {
                         if let Ok(metadata) = fs::metadata(&path) {
-                            if let (Ok(created), Ok(modified)) = (metadata.created(), metadata.modified()) {
+                            if let (Ok(created), Ok(modified)) =
+                                (metadata.created(), metadata.modified())
+                            {
                                 let start_time: DateTime<Utc> = created.into();
                                 let end_time: DateTime<Utc> = modified.into();
                                 let hours = (end_time - start_time).num_seconds() as f64 / 3600.0;
 
                                 sessions.push(WorkSession {
-                                    id: path.file_name().and_then(|n| n.to_str()).unwrap_or("vscode").to_string(),
+                                    id: path
+                                        .file_name()
+                                        .and_then(|n| n.to_str())
+                                        .unwrap_or("vscode")
+                                        .to_string(),
                                     start: start_time,
                                     end: end_time,
                                     project: "VSCode".to_string(),
@@ -1554,10 +1697,13 @@ impl TimelineAnalyzer {
                             // Resurrect files have timestamps in name
                             if filename.contains("tmux_resurrect_") {
                                 if let Ok(metadata) = fs::metadata(&path) {
-                                    if let (Ok(created), Ok(modified)) = (metadata.created(), metadata.modified()) {
+                                    if let (Ok(created), Ok(modified)) =
+                                        (metadata.created(), metadata.modified())
+                                    {
                                         let start_time: DateTime<Utc> = created.into();
                                         let end_time: DateTime<Utc> = modified.into();
-                                        let hours = (end_time - start_time).num_seconds() as f64 / 3600.0;
+                                        let hours =
+                                            (end_time - start_time).num_seconds() as f64 / 3600.0;
 
                                         sessions.push(WorkSession {
                                             id: filename.to_string(),

@@ -2,7 +2,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use anyhow::Result;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ShellAnalytics {
@@ -72,7 +71,7 @@ pub struct ShellAnalyzer {
 struct ParsedCommand {
     text: String,
     timestamp: Option<DateTime<Utc>>,
-    base_command: String,  // First word (e.g., "git" from "git commit")
+    base_command: String, // First word (e.g., "git" from "git commit")
     is_likely_error: bool,
 }
 
@@ -96,7 +95,8 @@ impl ShellAnalyzer {
                 continue;
             }
 
-            let base_command = command_text.split_whitespace()
+            let base_command = command_text
+                .split_whitespace()
                 .next()
                 .unwrap_or("")
                 .to_string();
@@ -156,7 +156,9 @@ impl ShellAnalyzer {
             "cannot find",
         ];
 
-        error_patterns.iter().any(|pattern| command.contains(pattern))
+        error_patterns
+            .iter()
+            .any(|pattern| command.contains(pattern))
     }
 
     pub fn analyze(&self) -> ShellAnalytics {
@@ -165,9 +167,7 @@ impl ShellAnalyzer {
         let most_used = self.find_most_used_commands(20);
 
         // Error analysis
-        let estimated_failures = self.commands.iter()
-            .filter(|c| c.is_likely_error)
-            .count();
+        let estimated_failures = self.commands.iter().filter(|c| c.is_likely_error).count();
         let failure_rate = if total_commands > 0 {
             estimated_failures as f64 / total_commands as f64 * 100.0
         } else {
@@ -182,24 +182,22 @@ impl ShellAnalyzer {
         let command_chains = self.find_common_chains();
 
         let avg_length: f64 = if !self.commands.is_empty() {
-            self.commands.iter()
-                .map(|c| c.text.len())
-                .sum::<usize>() as f64 / self.commands.len() as f64
+            self.commands.iter().map(|c| c.text.len()).sum::<usize>() as f64
+                / self.commands.len() as f64
         } else {
             0.0
         };
 
         // Time patterns
         let commands_by_hour = self.commands_by_hour_of_day();
-        let most_active_hour = commands_by_hour.iter()
+        let most_active_hour = commands_by_hour
+            .iter()
             .max_by_key(|(_, count)| **count)
             .map(|(hour, _)| *hour)
             .unwrap_or(0);
 
-        let productivity_score = self.calculate_productivity_score(
-            failure_rate,
-            struggle_sessions.len(),
-        );
+        let productivity_score =
+            self.calculate_productivity_score(failure_rate, struggle_sessions.len());
 
         ShellAnalytics {
             total_commands,
@@ -249,7 +247,8 @@ impl ShellAnalyzer {
         let mut permission_errors = Vec::new();
 
         for cmd in &self.commands {
-            if cmd.text.contains("npm") && (cmd.text.contains("ERR") || cmd.text.contains("error")) {
+            if cmd.text.contains("npm") && (cmd.text.contains("ERR") || cmd.text.contains("error"))
+            {
                 npm_errors.push(cmd.text.clone());
             } else if cmd.text.contains("cargo") && cmd.is_likely_error {
                 cargo_errors.push(cmd.text.clone());
@@ -305,9 +304,11 @@ impl ShellAnalyzer {
     }
 
     fn estimate_time_wasted(&self, error_patterns: &[ErrorPattern]) -> f64 {
-        error_patterns.iter()
+        error_patterns
+            .iter()
             .map(|p| p.estimated_time_wasted_minutes)
-            .sum::<f64>() / 60.0 // Convert to hours
+            .sum::<f64>()
+            / 60.0 // Convert to hours
     }
 
     fn detect_struggle_sessions(&self) -> Vec<StruggleSession> {
@@ -330,13 +331,14 @@ impl ShellAnalyzer {
                     let struggle_type = self.classify_struggle(&current_struggle);
 
                     sessions.push(StruggleSession {
-                        timestamp: current_struggle.first()
+                        timestamp: current_struggle
+                            .first()
                             .and_then(|c| c.timestamp)
                             .unwrap_or_else(Utc::now),
                         commands: current_struggle.iter().map(|c| c.text.clone()).collect(),
                         retries: current_struggle.len(),
                         duration_minutes: current_struggle.len() as f64 * 2.0, // Estimate
-                        eventually_succeeded: i < self.commands.len() - 1, // Heuristic
+                        eventually_succeeded: i < self.commands.len() - 1,     // Heuristic
                         struggle_type,
                     });
                 }
@@ -348,7 +350,8 @@ impl ShellAnalyzer {
     }
 
     fn classify_struggle(&self, commands: &[&ParsedCommand]) -> StruggleType {
-        let text = commands.iter()
+        let text = commands
+            .iter()
             .map(|c| c.text.as_str())
             .collect::<Vec<_>>()
             .join(" ");
@@ -373,13 +376,12 @@ impl ShellAnalyzer {
         let mut chains: HashMap<Vec<String>, usize> = HashMap::new();
 
         for window in self.commands.windows(2) {
-            let pattern: Vec<String> = window.iter()
-                .map(|c| c.base_command.clone())
-                .collect();
+            let pattern: Vec<String> = window.iter().map(|c| c.base_command.clone()).collect();
             *chains.entry(pattern).or_insert(0) += 1;
         }
 
-        let mut result: Vec<_> = chains.into_iter()
+        let mut result: Vec<_> = chains
+            .into_iter()
             .filter(|(_, count)| *count >= 3) // At least 3 occurrences
             .map(|(pattern, frequency)| CommandChain {
                 pattern,
