@@ -3439,6 +3439,828 @@ impl FlowState {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════
+// GAMIFIED & ADVANCED VISUALIZATIONS
+// ═══════════════════════════════════════════════════════════════
+
+/// AchievementBadges - Unlockable achievements display
+/// Shows earned badges with progress indicators
+pub struct AchievementBadges {
+    pub title: String,
+    pub badges: Vec<(String, String, bool, f64)>, // (name, icon, unlocked, progress)
+}
+
+impl AchievementBadges {
+    pub fn new(title: &str) -> Self {
+        Self {
+            title: title.to_string(),
+            badges: Vec::new(),
+        }
+    }
+
+    pub fn add_badge(&mut self, name: &str, icon: &str, unlocked: bool, progress: f64) {
+        self.badges.push((name.to_string(), icon.to_string(), unlocked, progress.clamp(0.0, 100.0)));
+    }
+
+    pub fn render(&self) -> String {
+        let mut output = String::new();
+        output.push_str(&format!("  {}\n\n", self.title.bold()));
+
+        let unlocked_count = self.badges.iter().filter(|(_, _, u, _)| *u).count();
+        output.push_str(&format!("  🏆 {} / {} Unlocked\n\n", unlocked_count, self.badges.len()));
+
+        for (name, icon, unlocked, progress) in &self.badges {
+            if *unlocked {
+                output.push_str(&format!("  {} {} {}\n", icon, name.green().bold(), "✓".green()));
+            } else {
+                let bar_width = 10;
+                let filled = (progress / 100.0 * bar_width as f64) as usize;
+                let bar = format!("{}{}",
+                    "█".repeat(filled),
+                    "░".repeat(bar_width - filled)
+                );
+                output.push_str(&format!("  {} {} {} {:.0}%\n",
+                    icon.dimmed(),
+                    name.dimmed(),
+                    bar.dimmed(),
+                    progress
+                ));
+            }
+        }
+
+        output
+    }
+}
+
+/// SkillTree - RPG-style skill/technology tree
+/// Shows progression through different skill branches
+pub struct SkillTree {
+    pub title: String,
+    pub branches: Vec<(String, Vec<(String, u8)>)>, // (branch_name, [(skill, level 0-5)])
+}
+
+impl SkillTree {
+    pub fn new(title: &str) -> Self {
+        Self {
+            title: title.to_string(),
+            branches: Vec::new(),
+        }
+    }
+
+    pub fn add_branch(&mut self, name: &str, skills: Vec<(&str, u8)>) {
+        self.branches.push((
+            name.to_string(),
+            skills.iter().map(|(s, l)| (s.to_string(), *l)).collect()
+        ));
+    }
+
+    pub fn render(&self) -> String {
+        let mut output = String::new();
+        output.push_str(&format!("  {}\n\n", self.title.bold()));
+
+        let level_chars = ["○", "◔", "◑", "◕", "●", "★"];
+
+        for (branch_name, skills) in &self.branches {
+            output.push_str(&format!("  ┌─ {} ─────────────────────\n", branch_name.cyan().bold()));
+
+            for (i, (skill, level)) in skills.iter().enumerate() {
+                let connector = if i == skills.len() - 1 { "└" } else { "├" };
+                let level_idx = (*level as usize).min(5);
+                let level_char = level_chars[level_idx];
+
+                let colored_char = match level_idx {
+                    5 => level_char.yellow().bold().to_string(),
+                    4 => level_char.green().to_string(),
+                    3 => level_char.cyan().to_string(),
+                    2 => level_char.blue().to_string(),
+                    1 => level_char.dimmed().to_string(),
+                    _ => level_char.dimmed().to_string(),
+                };
+
+                output.push_str(&format!("  {}── {} {} (Lv.{})\n",
+                    connector,
+                    colored_char,
+                    skill,
+                    level
+                ));
+            }
+            output.push('\n');
+        }
+
+        output.push_str(&format!("  Legend: {} None  {} Beginner  {} Intermediate  {} Advanced  {} Expert  {} Master\n",
+            level_chars[0].dimmed(),
+            level_chars[1].dimmed(),
+            level_chars[2].blue(),
+            level_chars[3].cyan(),
+            level_chars[4].green(),
+            level_chars[5].yellow()
+        ));
+
+        output
+    }
+}
+
+/// CommitGraph - Git-style commit activity visualization
+/// Shows commits over time with branch-like structure
+pub struct CommitGraph {
+    pub title: String,
+    pub commits: Vec<(String, String, u32)>, // (date, message, additions)
+}
+
+impl CommitGraph {
+    pub fn new(title: &str) -> Self {
+        Self {
+            title: title.to_string(),
+            commits: Vec::new(),
+        }
+    }
+
+    pub fn add_commit(&mut self, date: &str, message: &str, additions: u32) {
+        self.commits.push((date.to_string(), message.to_string(), additions));
+    }
+
+    pub fn render(&self) -> String {
+        let mut output = String::new();
+        output.push_str(&format!("  {}\n\n", self.title.bold()));
+
+        if self.commits.is_empty() {
+            output.push_str("  No commits\n");
+            return output;
+        }
+
+        let max_adds = self.commits.iter().map(|(_, _, a)| *a).max().unwrap_or(1);
+
+        for (i, (date, message, additions)) in self.commits.iter().enumerate() {
+            let is_last = i == self.commits.len() - 1;
+
+            // Commit node
+            let node_size = ((*additions as f64 / max_adds as f64) * 3.0) as usize;
+            let node = match node_size {
+                0 => "○",
+                1 => "◎",
+                2 => "●",
+                _ => "◉",
+            };
+
+            let colored_node = if *additions > max_adds / 2 {
+                node.green().bold().to_string()
+            } else {
+                node.cyan().to_string()
+            };
+
+            // Branch line
+            let branch = if is_last { "└" } else { "├" };
+            let line = if is_last { " " } else { "│" };
+
+            output.push_str(&format!("  {} {} {} +{}\n",
+                branch,
+                colored_node,
+                date.dimmed(),
+                additions.to_string().green()
+            ));
+
+            // Truncate message
+            let msg = if message.len() > 45 {
+                format!("{}...", &message[..42])
+            } else {
+                message.clone()
+            };
+            output.push_str(&format!("  {}   {}\n", line, msg));
+            if !is_last {
+                output.push_str(&format!("  {}\n", line));
+            }
+        }
+
+        output
+    }
+}
+
+/// ProductivityScore - Gamified productivity dashboard
+/// Shows score breakdown with level and XP
+pub struct ProductivityScore {
+    pub title: String,
+    pub total_score: u32,
+    pub level: u32,
+    pub xp_current: u32,
+    pub xp_next_level: u32,
+    pub multipliers: Vec<(String, f64)>,
+}
+
+impl ProductivityScore {
+    pub fn new(title: &str) -> Self {
+        Self {
+            title: title.to_string(),
+            total_score: 0,
+            level: 1,
+            xp_current: 0,
+            xp_next_level: 1000,
+            multipliers: Vec::new(),
+        }
+    }
+
+    pub fn set_score(&mut self, score: u32, level: u32, xp_current: u32, xp_next: u32) {
+        self.total_score = score;
+        self.level = level;
+        self.xp_current = xp_current;
+        self.xp_next_level = xp_next;
+    }
+
+    pub fn add_multiplier(&mut self, name: &str, value: f64) {
+        self.multipliers.push((name.to_string(), value));
+    }
+
+    pub fn render(&self) -> String {
+        let mut output = String::new();
+        output.push_str(&format!("  {}\n\n", self.title.bold()));
+
+        // Level display
+        let level_stars = "★".repeat((self.level as usize).min(5));
+        let empty_stars = "☆".repeat(5 - (self.level as usize).min(5));
+        output.push_str(&format!("  Level {} {}{}\n\n",
+            self.level.to_string().yellow().bold(),
+            level_stars.yellow(),
+            empty_stars.dimmed()
+        ));
+
+        // Score display
+        output.push_str(&format!("  ┌─────────────────────────────────┐\n"));
+        output.push_str(&format!("  │  PRODUCTIVITY SCORE             │\n"));
+        output.push_str(&format!("  │  {:^27}  │\n", format!("{}", self.total_score).green().bold()));
+        output.push_str(&format!("  └─────────────────────────────────┘\n\n"));
+
+        // XP bar
+        let xp_pct = (self.xp_current as f64 / self.xp_next_level as f64 * 100.0).min(100.0);
+        let bar_width = 25;
+        let filled = (xp_pct / 100.0 * bar_width as f64) as usize;
+        output.push_str(&format!("  XP: {}/{}\n",
+            self.xp_current.to_string().cyan(),
+            self.xp_next_level
+        ));
+        output.push_str(&format!("  [{}{}] {:.0}%\n\n",
+            "█".repeat(filled).cyan(),
+            "░".repeat(bar_width - filled),
+            xp_pct
+        ));
+
+        // Multipliers
+        if !self.multipliers.is_empty() {
+            output.push_str("  Active Multipliers:\n");
+            for (name, value) in &self.multipliers {
+                let colored = if *value >= 1.5 {
+                    format!("x{:.1}", value).green().bold().to_string()
+                } else if *value >= 1.0 {
+                    format!("x{:.1}", value).cyan().to_string()
+                } else {
+                    format!("x{:.1}", value).red().to_string()
+                };
+                output.push_str(&format!("    {} {}\n", colored, name));
+            }
+        }
+
+        output
+    }
+}
+
+/// EnergyMeter - Battery-style energy level indicator
+/// Shows current energy/focus level with depletion tracking
+pub struct EnergyMeter {
+    pub title: String,
+    pub current_energy: f64,  // 0-100
+    pub max_energy: f64,
+    pub drain_rate: f64,      // per hour
+    pub recharge_events: Vec<(String, f64)>,
+}
+
+impl EnergyMeter {
+    pub fn new(title: &str) -> Self {
+        Self {
+            title: title.to_string(),
+            current_energy: 100.0,
+            max_energy: 100.0,
+            drain_rate: 10.0,
+            recharge_events: Vec::new(),
+        }
+    }
+
+    pub fn set_energy(&mut self, current: f64, max: f64, drain: f64) {
+        self.current_energy = current.clamp(0.0, max);
+        self.max_energy = max;
+        self.drain_rate = drain;
+    }
+
+    pub fn add_recharge(&mut self, event: &str, amount: f64) {
+        self.recharge_events.push((event.to_string(), amount));
+    }
+
+    pub fn render(&self) -> String {
+        let mut output = String::new();
+        output.push_str(&format!("  {}\n\n", self.title.bold()));
+
+        let pct = self.current_energy / self.max_energy * 100.0;
+
+        // Battery visualization
+        let battery_width = 20;
+        let filled = (pct / 100.0 * battery_width as f64) as usize;
+
+        let (fill_char, color) = if pct > 60.0 {
+            ("█", "green")
+        } else if pct > 30.0 {
+            ("█", "yellow")
+        } else if pct > 10.0 {
+            ("█", "red")
+        } else {
+            ("▒", "red")
+        };
+
+        output.push_str("  ┌──────────────────────┬┐\n");
+        output.push_str(&format!("  │{}{}│█\n",
+            colorize_text(&fill_char.repeat(filled), color),
+            " ".repeat(battery_width - filled)
+        ));
+        output.push_str("  └──────────────────────┴┘\n\n");
+
+        // Stats
+        let energy_display = if pct > 60.0 {
+            format!("{:.0}%", pct).green()
+        } else if pct > 30.0 {
+            format!("{:.0}%", pct).yellow()
+        } else {
+            format!("{:.0}%", pct).red()
+        };
+
+        output.push_str(&format!("  Energy: {} ({:.0}/{:.0})\n", energy_display, self.current_energy, self.max_energy));
+        output.push_str(&format!("  Drain rate: {:.1}/hour\n", self.drain_rate));
+
+        let hours_left = if self.drain_rate > 0.0 {
+            self.current_energy / self.drain_rate
+        } else {
+            999.0
+        };
+        output.push_str(&format!("  Time remaining: {:.1}h\n", hours_left));
+
+        // Recharge events
+        if !self.recharge_events.is_empty() {
+            output.push_str("\n  Recharge boosts:\n");
+            for (event, amount) in &self.recharge_events {
+                output.push_str(&format!("    {} +{:.0}\n", event, amount));
+            }
+        }
+
+        // Status
+        let status = if pct > 80.0 {
+            "⚡ Fully charged! Maximum productivity!"
+        } else if pct > 60.0 {
+            "🔋 Good energy levels"
+        } else if pct > 30.0 {
+            "🔋 Moderate - consider a break soon"
+        } else if pct > 10.0 {
+            "⚠️ Low energy - take a break!"
+        } else {
+            "🪫 Critical! Rest immediately!"
+        };
+        output.push_str(&format!("\n  {}\n", status));
+
+        output
+    }
+}
+
+/// LearningCurve - Shows skill/knowledge progression over time
+/// Visualizes improvement trajectory
+pub struct LearningCurve {
+    pub title: String,
+    pub skill_name: String,
+    pub data_points: Vec<(String, f64)>, // (date, proficiency 0-100)
+}
+
+impl LearningCurve {
+    pub fn new(title: &str, skill: &str) -> Self {
+        Self {
+            title: title.to_string(),
+            skill_name: skill.to_string(),
+            data_points: Vec::new(),
+        }
+    }
+
+    pub fn add_point(&mut self, date: &str, proficiency: f64) {
+        self.data_points.push((date.to_string(), proficiency.clamp(0.0, 100.0)));
+    }
+
+    pub fn render(&self) -> String {
+        let mut output = String::new();
+        output.push_str(&format!("  {}\n", self.title.bold()));
+        output.push_str(&format!("  Skill: {}\n\n", self.skill_name.cyan()));
+
+        if self.data_points.is_empty() {
+            output.push_str("  No data\n");
+            return output;
+        }
+
+        let height = 8;
+        let width = self.data_points.len().min(40);
+
+        // Resample if needed
+        let data: Vec<f64> = if self.data_points.len() > width {
+            (0..width).map(|i| {
+                let idx = i * self.data_points.len() / width;
+                self.data_points[idx].1
+            }).collect()
+        } else {
+            self.data_points.iter().map(|(_, v)| *v).collect()
+        };
+
+        // Draw curve
+        for row in 0..height {
+            let threshold = 100.0 - (row as f64 / height as f64 * 100.0);
+            let label = match row {
+                0 => "100%",
+                r if r == height - 1 => "  0%",
+                _ => "    ",
+            };
+            output.push_str(&format!("  {} │", label));
+
+            for (i, &val) in data.iter().enumerate() {
+                let prev = if i > 0 { data[i - 1] } else { val };
+
+                let char = if val >= threshold && prev < threshold {
+                    "╱"
+                } else if val < threshold && prev >= threshold {
+                    "╲"
+                } else if val >= threshold && val >= threshold - (100.0 / height as f64) {
+                    "─"
+                } else {
+                    " "
+                };
+
+                let colored = if val > 80.0 {
+                    char.green().to_string()
+                } else if val > 50.0 {
+                    char.cyan().to_string()
+                } else if val > 25.0 {
+                    char.yellow().to_string()
+                } else {
+                    char.dimmed().to_string()
+                };
+                output.push_str(&colored);
+            }
+            output.push_str("│\n");
+        }
+        output.push_str(&format!("       └{}┘\n", "─".repeat(data.len())));
+
+        // Summary
+        let first = self.data_points.first().map(|(_, v)| *v).unwrap_or(0.0);
+        let last = self.data_points.last().map(|(_, v)| *v).unwrap_or(0.0);
+        let improvement = last - first;
+
+        output.push_str(&format!("\n  Start: {:.0}%  →  Current: {:.0}%\n", first, last));
+        if improvement > 0.0 {
+            output.push_str(&format!("  📈 Improvement: {}\n", format!("+{:.0}%", improvement).green()));
+        } else if improvement < 0.0 {
+            output.push_str(&format!("  📉 Change: {}\n", format!("{:.0}%", improvement).red()));
+        }
+
+        output
+    }
+}
+
+/// SessionStack - Stacked sessions showing depth and duration
+/// Visualizes coding session layers
+pub struct SessionStack {
+    pub title: String,
+    pub sessions: Vec<(String, f64, String)>, // (project, hours, status)
+}
+
+impl SessionStack {
+    pub fn new(title: &str) -> Self {
+        Self {
+            title: title.to_string(),
+            sessions: Vec::new(),
+        }
+    }
+
+    pub fn add_session(&mut self, project: &str, hours: f64, status: &str) {
+        self.sessions.push((project.to_string(), hours, status.to_string()));
+    }
+
+    pub fn render(&self) -> String {
+        let mut output = String::new();
+        output.push_str(&format!("  {}\n\n", self.title.bold()));
+
+        if self.sessions.is_empty() {
+            output.push_str("  No sessions\n");
+            return output;
+        }
+
+        let max_hours = self.sessions.iter().map(|(_, h, _)| *h).fold(0.0_f64, f64::max).max(1.0);
+        let total_hours: f64 = self.sessions.iter().map(|(_, h, _)| *h).sum();
+
+        // Draw stacked blocks
+        let width = 40;
+        output.push_str(&format!("  ┌{}┐\n", "─".repeat(width)));
+
+        for (project, hours, status) in self.sessions.iter().rev() {
+            let block_width = ((hours / max_hours) * (width - 4) as f64) as usize;
+            let status_icon = match status.as_str() {
+                "completed" => "✓".green(),
+                "active" => "●".cyan(),
+                "paused" => "◐".yellow(),
+                _ => "○".dimmed(),
+            };
+
+            let bar = "█".repeat(block_width.max(1));
+            let padding = width - 4 - block_width.max(1);
+
+            output.push_str(&format!("  │ {}{}{} │\n",
+                bar.cyan(),
+                " ".repeat(padding),
+                status_icon
+            ));
+            output.push_str(&format!("  │ {:width$} │\n",
+                format!("{} ({:.1}h)", project, hours),
+                width = width - 4
+            ));
+        }
+
+        output.push_str(&format!("  └{}┘\n", "─".repeat(width)));
+        output.push_str(&format!("\n  Total: {:.1}h across {} sessions\n", total_hours, self.sessions.len()));
+
+        output
+    }
+}
+
+/// MilestoneRoad - Road/path visualization to goals
+/// Shows progress along a journey with checkpoints
+pub struct MilestoneRoad {
+    pub title: String,
+    pub milestones: Vec<(String, bool, Option<String>)>, // (name, reached, date)
+    pub current_progress: f64, // 0-100 between milestones
+}
+
+impl MilestoneRoad {
+    pub fn new(title: &str) -> Self {
+        Self {
+            title: title.to_string(),
+            milestones: Vec::new(),
+            current_progress: 0.0,
+        }
+    }
+
+    pub fn add_milestone(&mut self, name: &str, reached: bool, date: Option<&str>) {
+        self.milestones.push((name.to_string(), reached, date.map(|s| s.to_string())));
+    }
+
+    pub fn set_progress(&mut self, progress: f64) {
+        self.current_progress = progress.clamp(0.0, 100.0);
+    }
+
+    pub fn render(&self) -> String {
+        let mut output = String::new();
+        output.push_str(&format!("  {}\n\n", self.title.bold()));
+
+        if self.milestones.is_empty() {
+            output.push_str("  No milestones\n");
+            return output;
+        }
+
+        let reached_count = self.milestones.iter().filter(|(_, r, _)| *r).count();
+        output.push_str(&format!("  Progress: {} / {} milestones\n\n", reached_count, self.milestones.len()));
+
+        // Find current position
+        let current_idx = self.milestones.iter().position(|(_, r, _)| !*r).unwrap_or(self.milestones.len());
+
+        for (i, (name, reached, date)) in self.milestones.iter().enumerate() {
+            let is_current = i == current_idx;
+            let is_last = i == self.milestones.len() - 1;
+
+            // Milestone marker
+            let marker = if *reached {
+                "◉".green()
+            } else if is_current {
+                "◎".yellow()
+            } else {
+                "○".dimmed()
+            };
+
+            // Road segment
+            let road = if is_last {
+                "   ".to_string()
+            } else if *reached {
+                " ║ ".green().to_string()
+            } else if is_current {
+                format!(" {} ", "┊".yellow())
+            } else {
+                " ┊ ".dimmed().to_string()
+            };
+
+            let name_str = if *reached {
+                name.green().to_string()
+            } else if is_current {
+                name.yellow().bold().to_string()
+            } else {
+                name.dimmed().to_string()
+            };
+
+            let date_str = date.as_ref().map(|d| format!(" ({})", d.dimmed())).unwrap_or_default();
+
+            output.push_str(&format!("  {} {}{}\n", marker, name_str, date_str));
+
+            if !is_last {
+                output.push_str(&format!("  {}\n", road));
+            }
+
+            // Show current position indicator
+            if is_current && self.current_progress > 0.0 && !is_last {
+                let position = (self.current_progress / 100.0 * 3.0) as usize;
+                for p in 0..3 {
+                    if p == position {
+                        output.push_str(&format!("  {} 🚀\n", "┊".yellow()));
+                    }
+                }
+            }
+        }
+
+        output
+    }
+}
+
+/// ComparisonRadar - Multi-axis spider/radar chart for comparisons
+/// Compare multiple items across different dimensions
+pub struct ComparisonRadar {
+    pub title: String,
+    pub axes: Vec<String>,
+    pub items: Vec<(String, Vec<f64>, String)>, // (name, values, color)
+}
+
+impl ComparisonRadar {
+    pub fn new(title: &str) -> Self {
+        Self {
+            title: title.to_string(),
+            axes: Vec::new(),
+            items: Vec::new(),
+        }
+    }
+
+    pub fn set_axes(&mut self, axes: Vec<&str>) {
+        self.axes = axes.iter().map(|s| s.to_string()).collect();
+    }
+
+    pub fn add_item(&mut self, name: &str, values: Vec<f64>, color: &str) {
+        self.items.push((name.to_string(), values, color.to_string()));
+    }
+
+    pub fn render(&self) -> String {
+        let mut output = String::new();
+        output.push_str(&format!("  {}\n\n", self.title.bold()));
+
+        if self.axes.is_empty() || self.items.is_empty() {
+            output.push_str("  No data\n");
+            return output;
+        }
+
+        // Render as horizontal bars per axis for ASCII compatibility
+        let max_name_len = self.axes.iter().map(|s| s.len()).max().unwrap_or(10);
+
+        for (axis_idx, axis) in self.axes.iter().enumerate() {
+            output.push_str(&format!("  {:>width$} │", axis, width = max_name_len));
+
+            for (_item_name, values, color) in &self.items {
+                let val = values.get(axis_idx).unwrap_or(&0.0);
+                let bar_len = (val / 100.0 * 10.0) as usize;
+                let bar = colorize_text(&"█".repeat(bar_len), color);
+                output.push_str(&format!(" {}", bar));
+            }
+            output.push('\n');
+        }
+
+        // Legend
+        output.push('\n');
+        for (name, _, color) in &self.items {
+            output.push_str(&format!("  {} {}\n", colorize_text("██", color), name));
+        }
+
+        output
+    }
+}
+
+/// StreakFlame - Animated fire-style streak display
+/// Shows current streak with intensity visualization
+pub struct StreakFlame {
+    pub title: String,
+    pub current_streak: u32,
+    pub best_streak: u32,
+    pub streak_history: Vec<u32>, // Last N days
+}
+
+impl StreakFlame {
+    pub fn new(title: &str) -> Self {
+        Self {
+            title: title.to_string(),
+            current_streak: 0,
+            best_streak: 0,
+            streak_history: Vec::new(),
+        }
+    }
+
+    pub fn set_streak(&mut self, current: u32, best: u32) {
+        self.current_streak = current;
+        self.best_streak = best;
+    }
+
+    pub fn set_history(&mut self, history: Vec<u32>) {
+        self.streak_history = history;
+    }
+
+    pub fn render(&self) -> String {
+        let mut output = String::new();
+        output.push_str(&format!("  {}\n\n", self.title.bold()));
+
+        // Flame intensity based on streak
+        let intensity = (self.current_streak as f64 / 30.0).min(1.0);
+
+        // ASCII flame art
+        if self.current_streak > 0 {
+            let flame_height = ((intensity * 5.0) as usize).max(1);
+
+            let flames = [
+                ("      ", "      "),
+                ("  )   ", "   (  "),
+                (" ) (  ", "  ) ( "),
+                ("( ) ) ", " ( ( )"),
+                (") ( ( ", "( ) ) "),
+            ];
+
+            for i in (0..flame_height).rev() {
+                let (left, right) = flames[i.min(4)];
+                let color = if i > 3 {
+                    "red"
+                } else if i > 1 {
+                    "yellow"
+                } else {
+                    "white"
+                };
+                output.push_str(&format!("  {}{}\n",
+                    colorize_text(left, color),
+                    colorize_text(right, color)
+                ));
+            }
+
+            output.push_str(&format!("  {}🔥{}\n", " ".repeat(4), " ".repeat(4)));
+        }
+
+        // Streak count
+        let streak_display = if self.current_streak >= self.best_streak && self.current_streak > 0 {
+            format!("{} 🏆 NEW RECORD!", self.current_streak).yellow().bold().to_string()
+        } else if self.current_streak > 20 {
+            format!("{} days", self.current_streak).red().bold().to_string()
+        } else if self.current_streak > 7 {
+            format!("{} days", self.current_streak).yellow().bold().to_string()
+        } else if self.current_streak > 0 {
+            format!("{} days", self.current_streak).green().to_string()
+        } else {
+            "0 days".dimmed().to_string()
+        };
+
+        output.push_str(&format!("\n  Current: {}\n", streak_display));
+        output.push_str(&format!("  Best:    {} days\n", self.best_streak));
+
+        // Streak history sparkline
+        if !self.streak_history.is_empty() {
+            output.push_str("\n  History: ");
+            for &s in self.streak_history.iter().take(14) {
+                let char = if s > 0 { "█" } else { "░" };
+                let colored = if s > 7 {
+                    char.red().to_string()
+                } else if s > 3 {
+                    char.yellow().to_string()
+                } else if s > 0 {
+                    char.green().to_string()
+                } else {
+                    char.dimmed().to_string()
+                };
+                output.push_str(&colored);
+            }
+            output.push('\n');
+        }
+
+        // Motivation message
+        let msg = if self.current_streak == 0 {
+            "Start a new streak today!"
+        } else if self.current_streak < 3 {
+            "Keep going! Building momentum..."
+        } else if self.current_streak < 7 {
+            "Nice streak! Almost a week!"
+        } else if self.current_streak < 14 {
+            "Impressive! Two weeks in sight!"
+        } else if self.current_streak < 30 {
+            "On fire! A month is within reach!"
+        } else {
+            "LEGENDARY! You're unstoppable!"
+        };
+        output.push_str(&format!("\n  💪 {}\n", msg));
+
+        output
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

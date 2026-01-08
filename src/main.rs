@@ -2696,7 +2696,122 @@ async fn main() -> Result<()> {
             print!("{}", flow.render());
 
             println!("\n{}", "═══════════════════════════════════════════════════════════════".cyan());
-            println!("{}", "  36 visualization types available! Use in TUI: 'vibedev tui'".dimmed());
+            println!("{}", "  🎮 GAMIFIED VISUALIZATIONS".magenta().bold());
+            println!("{}", "═══════════════════════════════════════════════════════════════".cyan());
+
+            // 37. Achievement Badges
+            println!("\n{}", "━━━ Achievement Badges ━━━".yellow().bold());
+            let mut badges = ascii_charts::AchievementBadges::new("Developer Achievements");
+            badges.add_badge("First Commit", "🎯", true, 100.0);
+            badges.add_badge("100 Sessions", "💯", true, 100.0);
+            badges.add_badge("Night Owl", "🦉", true, 100.0);
+            badges.add_badge("1M Tokens", "🚀", false, 72.0);
+            badges.add_badge("Marathon Coder", "🏃", false, 45.0);
+            badges.add_badge("Bug Slayer", "🐛", false, 88.0);
+            print!("{}", badges.render());
+
+            // 38. Skill Tree
+            println!("\n{}", "━━━ Skill Tree ━━━".yellow().bold());
+            let mut tree = ascii_charts::SkillTree::new("Technology Skill Tree");
+            tree.add_branch("Frontend", vec![
+                ("HTML/CSS", 5),
+                ("JavaScript", 4),
+                ("React", 4),
+                ("TypeScript", 3),
+            ]);
+            tree.add_branch("Backend", vec![
+                ("Rust", 4),
+                ("Node.js", 3),
+                ("Databases", 3),
+                ("APIs", 4),
+            ]);
+            tree.add_branch("DevOps", vec![
+                ("Git", 5),
+                ("Docker", 2),
+                ("CI/CD", 2),
+            ]);
+            print!("{}", tree.render());
+
+            // 39. Commit Graph
+            println!("\n{}", "━━━ Commit Graph ━━━".yellow().bold());
+            let mut commits = ascii_charts::CommitGraph::new("Recent Activity");
+            commits.add_commit("Jan 08", "feat: Add 10 creative insight visualizations", 1020);
+            commits.add_commit("Jan 07", "fix: Resolve GanttChart padding bug", 45);
+            commits.add_commit("Jan 06", "feat: Add 12 new ASCII visualization types", 920);
+            commits.add_commit("Jan 05", "refactor: Improve chart rendering performance", 230);
+            commits.add_commit("Jan 04", "docs: Update CLAUDE.md with new features", 150);
+            print!("{}", commits.render());
+
+            // 40. Productivity Score
+            println!("\n{}", "━━━ Productivity Score ━━━".yellow().bold());
+            let mut score = ascii_charts::ProductivityScore::new("Your Productivity");
+            score.set_score(8750, 12, 750, 1000);
+            score.add_multiplier("Streak Bonus", 1.5);
+            score.add_multiplier("Flow State", 2.0);
+            score.add_multiplier("Early Bird", 1.2);
+            print!("{}", score.render());
+
+            // 41. Energy Meter
+            println!("\n{}", "━━━ Energy Meter ━━━".yellow().bold());
+            let mut energy = ascii_charts::EnergyMeter::new("Developer Energy");
+            energy.set_energy(65.0, 100.0, 8.0);
+            energy.add_recharge("☕ Coffee break", 15.0);
+            energy.add_recharge("🚶 Walk", 10.0);
+            print!("{}", energy.render());
+
+            // 42. Learning Curve
+            println!("\n{}", "━━━ Learning Curve ━━━".yellow().bold());
+            let mut curve = ascii_charts::LearningCurve::new("Skill Progression", "Rust");
+            curve.add_point("Week 1", 10.0);
+            curve.add_point("Week 2", 20.0);
+            curve.add_point("Week 3", 35.0);
+            curve.add_point("Week 4", 45.0);
+            curve.add_point("Week 5", 55.0);
+            curve.add_point("Week 6", 62.0);
+            curve.add_point("Week 7", 70.0);
+            curve.add_point("Week 8", 78.0);
+            curve.add_point("Week 9", 82.0);
+            curve.add_point("Week 10", 88.0);
+            print!("{}", curve.render());
+
+            // 43. Session Stack
+            println!("\n{}", "━━━ Session Stack ━━━".yellow().bold());
+            let mut stack = ascii_charts::SessionStack::new("Today's Sessions");
+            stack.add_session("vibedev", 3.5, "completed");
+            stack.add_session("opensvm-cli", 2.0, "completed");
+            stack.add_session("website", 1.5, "paused");
+            stack.add_session("scripts", 0.5, "active");
+            print!("{}", stack.render());
+
+            // 44. Milestone Road
+            println!("\n{}", "━━━ Milestone Road ━━━".yellow().bold());
+            let mut road = ascii_charts::MilestoneRoad::new("Project Journey");
+            road.add_milestone("Project Start", true, Some("Dec 1"));
+            road.add_milestone("MVP Complete", true, Some("Dec 15"));
+            road.add_milestone("Beta Release", true, Some("Jan 1"));
+            road.add_milestone("v1.0 Release", false, None);
+            road.add_milestone("1000 Users", false, None);
+            road.set_progress(40.0);
+            print!("{}", road.render());
+
+            // 45. Comparison Radar
+            println!("\n{}", "━━━ Comparison Radar ━━━".yellow().bold());
+            let mut radar = ascii_charts::ComparisonRadar::new("Tool Comparison");
+            radar.set_axes(vec!["Speed", "Accuracy", "Cost", "Features", "Support"]);
+            radar.add_item("Claude", vec![90.0, 95.0, 70.0, 95.0, 85.0], "cyan");
+            radar.add_item("GPT-4", vec![85.0, 90.0, 60.0, 90.0, 80.0], "green");
+            radar.add_item("Gemini", vec![95.0, 85.0, 80.0, 85.0, 75.0], "yellow");
+            print!("{}", radar.render());
+
+            // 46. Streak Flame
+            println!("\n{}", "━━━ Streak Flame ━━━".yellow().bold());
+            let mut flame = ascii_charts::StreakFlame::new("Coding Streak");
+            flame.set_streak(19, 20);
+            flame.set_history(vec![5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]);
+            print!("{}", flame.render());
+
+            println!("\n{}", "═══════════════════════════════════════════════════════════════".cyan());
+            println!("{}", "  46 visualization types available! Use in TUI: 'vibedev tui'".dimmed());
             println!("{}", "═══════════════════════════════════════════════════════════════".cyan());
 
             Ok(())
