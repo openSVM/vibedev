@@ -136,19 +136,19 @@ get_feature_paths() {
     # Use prefix-based lookup to support multiple branches per spec
     local feature_dir=$(find_feature_dir_by_prefix "$repo_root" "$current_branch")
 
-    cat <<EOF
-REPO_ROOT='$repo_root'
-CURRENT_BRANCH='$current_branch'
-HAS_GIT='$has_git_repo'
-FEATURE_DIR='$feature_dir'
-FEATURE_SPEC='$feature_dir/spec.md'
-IMPL_PLAN='$feature_dir/plan.md'
-TASKS='$feature_dir/tasks.md'
-RESEARCH='$feature_dir/research.md'
-DATA_MODEL='$feature_dir/data-model.md'
-QUICKSTART='$feature_dir/quickstart.md'
-CONTRACTS_DIR='$feature_dir/contracts'
-EOF
+    # Output key=value pairs with proper escaping for safe parsing
+    # Values are output without quotes - the caller will use printf -v for safe assignment
+    printf 'REPO_ROOT=%s\n' "$repo_root"
+    printf 'CURRENT_BRANCH=%s\n' "$current_branch"
+    printf 'HAS_GIT=%s\n' "$has_git_repo"
+    printf 'FEATURE_DIR=%s\n' "$feature_dir"
+    printf 'FEATURE_SPEC=%s\n' "$feature_dir/spec.md"
+    printf 'IMPL_PLAN=%s\n' "$feature_dir/plan.md"
+    printf 'TASKS=%s\n' "$feature_dir/tasks.md"
+    printf 'RESEARCH=%s\n' "$feature_dir/research.md"
+    printf 'DATA_MODEL=%s\n' "$feature_dir/data-model.md"
+    printf 'QUICKSTART=%s\n' "$feature_dir/quickstart.md"
+    printf 'CONTRACTS_DIR=%s\n' "$feature_dir/contracts"
 }
 
 check_file() { [[ -f "$1" ]] && echo "  ✓ $2" || echo "  ✗ $2"; }
