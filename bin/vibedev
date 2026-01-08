@@ -1,0 +1,40 @@
+#!/usr/bin/env node
+
+/**
+ * Wrapper script for vibedev binary
+ * Executes the native Rust binary with all passed arguments
+ */
+
+const { spawn } = require('child_process');
+const path = require('path');
+const fs = require('fs');
+const os = require('os');
+
+const BINARY_NAME = 'vibedev' + (os.platform() === 'win32' ? '.exe' : '');
+const binaryPath = path.join(__dirname, BINARY_NAME);
+
+// Check if binary exists
+if (!fs.existsSync(binaryPath)) {
+  console.error('Error: vibedev binary not found at', binaryPath);
+  console.error('\nThe binary may not have been downloaded during installation.');
+  console.error('Try reinstalling: npm install -g vibedev');
+  console.error('\nOr build from source:');
+  console.error('  git clone https://github.com/openSVM/vibedev');
+  console.error('  cd vibedev && cargo install --path .');
+  process.exit(1);
+}
+
+// Spawn the binary with all arguments passed through
+const child = spawn(binaryPath, process.argv.slice(2), {
+  stdio: 'inherit',
+  env: process.env,
+});
+
+child.on('error', (err) => {
+  console.error('Failed to execute vibedev:', err.message);
+  process.exit(1);
+});
+
+child.on('close', (code) => {
+  process.exit(code || 0);
+});

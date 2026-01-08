@@ -1,0 +1,49 @@
+# Rust source and build artifacts
+src/
+target/
+Cargo.toml
+Cargo.lock
+.cargo/
+*.rs
+
+# Git
+.git/
+.gitignore
+.github/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Testing
+tests/
+*.test.js
+
+# Documentation (keep README)
+CLAUDE.md
+docs/
+
+# Specify workflow
+.specify/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Development files
+.env
+.env.*
+*.log
+
+# Rust specific
+rustfmt.toml
+clippy.toml
+rust-toolchain.toml
+
+# Keep these (defined in package.json files array)
+# bin/
+# scripts/
+# README.md
+# LICENSE
