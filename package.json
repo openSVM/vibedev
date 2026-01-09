@@ -23,7 +23,7 @@
     "url": "https://github.com/openSVM/vibedev/issues"
   },
   "bin": {
-    "vibedev": "./bin/vibedev"
+    "claudev": "./bin/claudev"
   },
   "scripts": {
     "postinstall": "node scripts/postinstall.js"

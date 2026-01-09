@@ -1,5 +1,5 @@
 [package]
-name = "vibedev"
+name = "claudev"
 version = "0.0.1"
 edition = "2021"
 description = "Analyze AI coding assistant usage patterns, costs, and productivity"
@@ -99,5 +99,5 @@ tempfile = "3.12"
 criterion = "0.5"
 
 [[bin]]
-name = "vibedev"
+name = "claudev"
 path = "src/main.rs"

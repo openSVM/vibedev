@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Postinstall script for vibedev npm package
+ * Postinstall script for claudev npm package
  * Downloads the appropriate prebuilt binary for the user's platform
  */
 
@@ -13,7 +13,7 @@ const { execFileSync } = require('child_process');
 
 const PACKAGE_VERSION = require('../package.json').version;
 const REPO = 'openSVM/vibedev';
-const BINARY_NAME = 'vibedev';
+const BINARY_NAME = 'claudev';
 
 // Map Node.js platform/arch to Rust target triples
 const PLATFORM_MAP = {
