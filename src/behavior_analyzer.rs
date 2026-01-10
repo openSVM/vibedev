@@ -1574,24 +1574,82 @@ impl BehaviorAnalyzer {
 
     /// Detect error handling patterns
     fn analyze_error_handling(&self, scores: &mut HashMap<CodeCategory, f64>, evidence: &mut Vec<String>) {
+        // ITERATION 25 PRECISION FIX: Require multiple signals to avoid false positives
+        // Found: 87% false positive rate with old thresholds!
+        // Files with incidental error throwing (React hooks, parsers) were misclassified
+
         let try_count = self.code.matches("try{").count();
         let catch_count = self.code.matches("catch(").count();
         let throw_count = self.code.matches("throw ").count();
+        let error_new_count = self.code.matches("new Error(").count() +
+                              self.code.matches("new TypeError(").count() +
+                              self.code.matches("new RangeError(").count();
 
-        if try_count >= 2 && catch_count >= 2 {
-            *scores.entry(CodeCategory::ErrorHandler).or_insert(0.0) += (try_count + catch_count) as f64 * 0.3;
-            evidence.push(format!("Error handling: {} try/catch blocks", try_count));
-        }
+        // Signal 1: Substantial error handling (try/catch blocks)
+        let has_error_handling = try_count >= 4 && catch_count >= 4;  // Raised from 2 to 4
 
-        if throw_count >= 3 {
-            *scores.entry(CodeCategory::ErrorHandler).or_insert(0.0) += throw_count as f64 * 0.2;
-            evidence.push(format!("Error throwing: {} throw statements", throw_count));
-        }
+        // Signal 2: Substantial error throwing (indicates error generation, not just control flow)
+        let has_error_throwing = throw_count >= 8;  // Raised from 3 to 8
 
-        // Detect error recovery patterns
-        if self.code.contains("retry") || self.code.contains("fallback") {
-            *scores.entry(CodeCategory::ErrorHandler).or_insert(0.0) += 0.5;
-            evidence.push("Error recovery (retry/fallback)".to_string());
+        // Signal 3: Error recovery patterns
+        let has_error_recovery = self.code.contains("retry") ||
+                                 self.code.contains("fallback") ||
+                                 self.code.contains("recover");
+
+        // Signal 4: Error construction (creating custom errors)
+        let has_error_construction = error_new_count >= 3;
+
+        // Signal 5: Error handler function names
+        let has_error_handler_names = self.code.contains("handleError") ||
+                                      self.code.contains("errorHandler") ||
+                                      self.code.contains("onError") ||
+                                      self.code.contains("catchError");
+
+        // Count how many signals are present
+        let signal_count = [
+            has_error_handling,
+            has_error_throwing,
+            has_error_recovery,
+            has_error_construction,
+            has_error_handler_names,
+        ].iter().filter(|&&x| x).count();
+
+        // REQUIRE at least 2 signals for error handling to be primary purpose
+        if signal_count >= 2 {
+            let mut error_score = 0.0;
+
+            if has_error_handling {
+                error_score += (try_count + catch_count) as f64 * 0.4;
+                evidence.push(format!("Error handling: {} try/catch blocks", try_count));
+            }
+
+            if has_error_throwing {
+                error_score += throw_count as f64 * 0.3;
+                evidence.push(format!("Error throwing: {} throw statements", throw_count));
+            }
+
+            if has_error_recovery {
+                error_score += 1.5;  // Increased bonus for recovery patterns
+                evidence.push("Error recovery (retry/fallback)".to_string());
+            }
+
+            if has_error_construction {
+                error_score += error_new_count as f64 * 0.4;
+                evidence.push(format!("Error construction: {} new Error()", error_new_count));
+            }
+
+            if has_error_handler_names {
+                error_score += 1.0;
+                evidence.push("Error handler function names".to_string());
+            }
+
+            // Add bonus for multiple signals (high confidence)
+            if signal_count >= 3 {
+                error_score += 1.0;
+                evidence.push(format!("Multiple error signals ({})", signal_count));
+            }
+
+            *scores.entry(CodeCategory::ErrorHandler).or_insert(0.0) += error_score;
         }
     }
 
